@@ -38,6 +38,8 @@ Accompanying the 100 logo images are 400 abstract banner requests (`BannerReques
 
 We also extend the 400 abstract banner requests to 5200 concrete requests across 13 standard banner dimensions with detailed banner specifications (`BannerRequest400/concrete_5k.jsonl`) via GPT-4o.
 
+[1] Jia, Peidong, et al. "COLE: A Hierarchical Generation Framework for Multi-Layered and Editable Graphic Design." arXiv preprint arXiv:2311.16974 (2023).
+
 ## Evaluation
 ```bash
 python3 eval.py --logo_file --image_file --banner_request 
