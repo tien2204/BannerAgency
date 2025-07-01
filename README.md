@@ -12,7 +12,7 @@ An autonomous agent system for editable banner ad image generation empowered by 
 
 **BannerAgency: Advertising Banner Design with Multimodal LLM Agents**
 
-Authors: [Heng Wang](https://scholar.google.com.au/citations?user=jPj4ViQAAAAJ&hl=en), Yotaro Shimose, and [Shingo Takamatsu](https://scholar.google.co.jp/citations?user=oCVG8wQAAAAJ&hl=en) from Sony Group Corporation
+Authors: [Heng Wang](https://scholar.google.com.au/citations?user=jPj4ViQAAAAJ&hl=en), [Yotaro Shimose](https://github.com/yotaro-shimose), and [Shingo Takamatsu](https://scholar.google.co.jp/citations?user=oCVG8wQAAAAJ&hl=en) from Sony Group Corporation
 
 ## Installation
 
