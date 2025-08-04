@@ -25,6 +25,9 @@ pip install -r requirements.txt
 Please specify your API keys by copying `.env.example` to `.env`.
 
 ## Scheduled Releases
+August 4, 2025
+- [x] All the agent prompts have been released.
+
 July 1, 2025
 - [x] BannerRequest400 dataset release.
 - [x] Evaluation code release.
@@ -57,4 +60,4 @@ If you find our work helpful in your research, please kindly cite our paper via:
 ```
 
 ## Contact
-If you have any questions or suggestions about this repo, please feel free to contact me! ([heng.wang@sony.com](heng.wang@sony.com))
+If you have any questions or suggestions about this repo, please feel free to contact me ([heng.wang@sony.com](heng.wang@sony.com)) or Shingo Takamatsu ([shingo.takamatsu@sony.com](shingo.takamatsu@sony.com))
