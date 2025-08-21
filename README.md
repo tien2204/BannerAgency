@@ -10,7 +10,7 @@ An autonomous agent system for editable banner ad image generation empowered by 
 
 
 
-**BannerAgency: Advertising Banner Design with Multimodal LLM Agents**
+**BannerAgency: Advertising Banner Design with Multimodal LLM Agents**, EMNLP 2025 Main
 
 Authors: [Heng Wang](https://scholar.google.com.au/citations?user=jPj4ViQAAAAJ&hl=en), [Yotaro Shimose](https://github.com/yotaro-shimose), and [Shingo Takamatsu](https://scholar.google.co.jp/citations?user=oCVG8wQAAAAJ&hl=en) from Sony Group Corporation
 
@@ -54,7 +54,7 @@ If you find our work helpful in your research, please kindly cite our paper via:
 @article{wang2025banneragency,
   title     = {BannerAgency: Advertising Banner Design with Multimodal LLM Agents},
   author    = {Wang, Heng and Shimose, Yotaro and Takamatsu, Shingo},
-  url = {arxiv},
+  url = {EMNLP Main},
   year      = {2025},
 }
 ```
