@@ -13,11 +13,19 @@ load_dotenv()
 class BannerAgent:
     def __init__(self, model_name="gpt-5-nano"):
         llm_kwargs = {
-        "model": model_name,
-        "openai_api_key": os.getenv("OPENAI_API_KEY"),
-        "max_retries": 3,
-        "max_completion_tokens": 4000
+            "model": model_name,
+            "openai_api_key": os.getenv("OPENAI_API_KEY"),
+            "max_retries": 3,
+            "temperature": 1.0,  # <-- THÊM DÒNG NÀY ĐỂ SỬA LỖI
+            "model_kwargs": {
+                # Sửa cảnh báo UserWarning: chuyển max_completion_tokens vào đây
+                # và đổi tên thành max_tokens theo chuẩn của OpenAI API
+                "max_completion_tokens": 4000 
+            }
         }
+
+        # Xóa tham số không còn hợp lệ ra khỏi khởi tạo chính
+        # llm_kwargs.pop("max_completion_tokens", None) 
 
         self.llm = ChatOpenAI(**llm_kwargs)
         self.load_prompts()
@@ -385,8 +393,314 @@ Focus on:
         
         return feedback
     
+    def export_to_svg(self, layout: Dict[str, Any], background_description: str, width: int, height: int, logo_path: str = None) -> str:
+        """Convert layout spec into comprehensive SVG code with logo support"""
+        svg_elements = []
+        
+        # Enhanced background with gradient support
+        bg_color = "#f0f0f0"  # default
+        if "blue" in background_description.lower():
+            bg_color = "url(#blueGradient)"
+            svg_elements.append('''
+            <defs>
+                <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#3498db;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#2c3e50;stop-opacity:1" />
+                </linearGradient>
+            </defs>''')
+        elif "green" in background_description.lower():
+            bg_color = "url(#greenGradient)"
+            svg_elements.append('''
+            <defs>
+                <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#2ecc71;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#27ae60;stop-opacity:1" />
+                </linearGradient>
+            </defs>''')
+        
+        # Background rectangle
+        svg_elements.append(f'<rect width="{width}" height="{height}" fill="{bg_color}"/>')
+        
+        # Headline with proper text wrapping
+        if "headline" in layout:
+            hl = layout["headline"]
+            svg_elements.append(f'''
+            <text x="{hl["position"]["x"]}" y="{hl["position"]["y"]}" 
+                font-family="{hl["font"]}" font-size="{hl["size"]}px" 
+                fill="{hl["color"]}" text-anchor="start" 
+                dominant-baseline="hanging">
+                {hl["text"]}
+            </text>''')
+        
+        # Subheadline
+        if "subheadline" in layout:
+            sh = layout["subheadline"]
+            svg_elements.append(f'''
+            <text x="{sh["position"]["x"]}" y="{sh["position"]["y"]}" 
+                font-family="{sh["font"]}" font-size="{sh["size"]}px" 
+                fill="{sh["color"]}" text-anchor="start" 
+                dominant-baseline="hanging">
+                {sh["text"]}
+            </text>''')
+        
+        # CTA button with rounded corners and shadow
+        if "cta" in layout:
+            cta = layout["cta"]
+            svg_elements.append(f'''
+            <defs>
+                <filter id="buttonShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+                </filter>
+            </defs>
+            <rect x="{cta["position"]["x"]}" y="{cta["position"]["y"]}" 
+                width="{cta["width"]}" height="{cta["height"]}" 
+                rx="{cta["border_radius"]}" ry="{cta["border_radius"]}"
+                fill="{cta["background_color"]}" 
+                filter="url(#buttonShadow)"
+                style="cursor:pointer"/>
+            <text x="{cta["position"]["x"] + cta["width"]/2}" 
+                y="{cta["position"]["y"] + cta["height"]/2}" 
+                font-family="{cta["font"]}" font-size="{cta["size"]}px" 
+                fill="{cta["color"]}" text-anchor="middle" 
+                dominant-baseline="central">
+                {cta["text"]}
+            </text>''')
+        
+        # Logo - Enhanced to handle actual logo image
+        if "logo" in layout:
+            logo = layout["logo"]
+            
+            # If logo_path exists and is valid, embed the image
+            if logo_path and os.path.exists(logo_path):
+                try:
+                    # Convert logo to base64 for embedding in SVG
+                    logo_data = self.prepare_image_message(logo_path)
+                    svg_elements.append(f'''
+                    <image x="{logo["position"]["x"]}" y="{logo["position"]["y"]}" 
+                        width="{logo["width"]}" height="{logo["height"]}" 
+                        href="{logo_data}" 
+                        preserveAspectRatio="xMidYMid meet"/>''')
+                except Exception as e:
+                    print(f"Warning: Could not embed logo image: {e}")
+                    # Fallback to placeholder with better styling based on filename
+                    logo_text = self.extract_logo_name_from_path(logo_path)
+                    svg_elements.append(f'''
+                    <rect x="{logo["position"]["x"]}" y="{logo["position"]["y"]}" 
+                        width="{logo["width"]}" height="{logo["height"]}" 
+                        fill="#2c3e50" stroke="#34495e" stroke-width="2" rx="8"/>
+                    <text x="{logo["position"]["x"] + logo["width"]/2}" 
+                        y="{logo["position"]["y"] + logo["height"]/2}" 
+                        font-family="Arial Bold" font-size="{min(logo["width"]//8, logo["height"]//2)}" 
+                        fill="#ffffff" text-anchor="middle" 
+                        dominant-baseline="central">{logo_text}</text>''')
+            else:
+                # Default placeholder
+                svg_elements.append(f'''
+                <rect x="{logo["position"]["x"]}" y="{logo["position"]["y"]}" 
+                    width="{logo["width"]}" height="{logo["height"]}" 
+                    fill="#cccccc" stroke="#999999" stroke-width="1" rx="3"/>
+                <text x="{logo["position"]["x"] + logo["width"]/2}" 
+                    y="{logo["position"]["y"] + logo["height"]/2}" 
+                    font-family="Arial" font-size="12" 
+                    fill="#666666" text-anchor="middle" 
+                    dominant-baseline="central">LOGO</text>''')
+        
+        # Combine all elements
+        svg_content = ''.join(svg_elements)
+        
+        return f'''<?xml version="1.0" encoding="UTF-8"?>
+        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+            width="{width}" height="{height}" 
+            viewBox="0 0 {width} {height}">
+            {svg_content}
+        </svg>'''
+
+    def extract_logo_name_from_path(self, logo_path: str) -> str:
+        """Extract a display name from logo file path"""
+        if not logo_path:
+            return "LOGO"
+        
+        # Get filename without extension
+        filename = os.path.splitext(os.path.basename(logo_path))[0]
+        
+        # Handle common naming patterns
+        if "ethic" in filename.lower():
+            return "ETHIC AI"
+        elif "ai" in filename.lower():
+            return "AI"
+        elif "_" in filename:
+            # Split on underscore and capitalize
+            parts = filename.split("_")
+            return " ".join(part.upper() for part in parts if part.isalpha())
+        else:
+            return filename.upper()[:10]  # Limit length
+
+    def export_to_figma_plugin(self, layout: Dict[str, Any], background_description: str, width: int, height: int) -> Dict[str, str]:
+        """Generate complete Figma Plugin files"""
+        
+        # manifest.json
+        manifest = {
+            "name": "Banner Generator Plugin",
+            "id": "banner-generator",
+            "api": "1.0.0",
+            "main": "code.js",
+            "ui": "ui.html"
+        }
+        
+        # ui.html
+        ui_html = f'''<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Banner Generator</title>
+            <style>
+                body {{ font-family: 'Inter', sans-serif; margin: 20px; }}
+                .banner-preview {{ 
+                    width: {width//2}px; 
+                    height: {height//2}px; 
+                    border: 1px solid #ccc; 
+                    margin: 10px 0; 
+                    transform-origin: top left;
+                    transform: scale(0.5);
+                }}
+                button {{ 
+                    background: #18A0FB; 
+                    color: white; 
+                    border: none; 
+                    padding: 8px 16px; 
+                    border-radius: 6px; 
+                    cursor: pointer; 
+                }}
+            </style>
+        </head>
+        <body>
+            <h2>Banner Generator</h2>
+            <div class="banner-preview" id="preview"></div>
+            <button onclick="createBanner()">Create Banner in Figma</button>
+            
+            <script>
+                const layout = {json.dumps(layout, indent=2)};
+                const dimensions = {{ width: {width}, height: {height} }};
+                
+                function createBanner() {{
+                    parent.postMessage({{ pluginMessage: {{ type: 'create-banner', layout, dimensions }} }}, '*');
+                }}
+                
+                // Preview rendering
+                document.getElementById('preview').innerHTML = `
+                    <div style="width: {width}px; height: {height}px; background: #f0f0f0; position: relative;">
+                        <div style="position: absolute; left: {layout.get('headline', {}).get('position', {}).get('x', 0)}px; 
+                                top: {layout.get('headline', {}).get('position', {}).get('y', 0)}px; 
+                                font-size: {layout.get('headline', {}).get('size', 24)}px; 
+                                color: {layout.get('headline', {}).get('color', '#000')};
+                                font-family: {layout.get('headline', {}).get('font', 'Arial')};">
+                            {layout.get('headline', {}).get('text', 'Headline')}
+                        </div>
+                    </div>
+                `;
+            </script>
+        </body>
+        </html>'''
+        
+        # code.js (Figma Plugin API)
+        code_js = f'''// Figma Plugin Code
+        figma.showUI(__html__, {{ width: 400, height: 300 }});
+
+        figma.ui.onmessage = msg => {{
+        if (msg.type === 'create-banner') {{
+            const {{ layout, dimensions }} = msg;
+            
+            // Create frame for banner
+            const frame = figma.createFrame();
+            frame.name = "Generated Banner";
+            frame.resize(dimensions.width, dimensions.height);
+            frame.fills = [{{
+            type: 'SOLID',
+            color: {{ r: 0.94, g: 0.94, b: 0.94 }}
+            }}];
+            
+            // Add headline
+            if (layout.headline) {{
+            const headline = figma.createText();
+            headline.name = "Headline";
+            headline.characters = layout.headline.text;
+            headline.fontSize = layout.headline.size;
+            headline.x = layout.headline.position.x;
+            headline.y = layout.headline.position.y;
+            
+            // Convert hex color to RGB
+            const color = hexToRgb(layout.headline.color);
+            headline.fills = [{{
+                type: 'SOLID',
+                color: {{ r: color.r/255, g: color.g/255, b: color.b/255 }}
+            }}];
+            
+            frame.appendChild(headline);
+            }}
+            
+            // Add CTA button
+            if (layout.cta) {{
+            const button = figma.createRectangle();
+            button.name = "CTA Button";
+            button.resize(layout.cta.width, layout.cta.height);
+            button.x = layout.cta.position.x;
+            button.y = layout.cta.position.y;
+            button.cornerRadius = layout.cta.border_radius;
+            
+            const bgColor = hexToRgb(layout.cta.background_color);
+            button.fills = [{{
+                type: 'SOLID',
+                color: {{ r: bgColor.r/255, g: bgColor.g/255, b: bgColor.b/255 }}
+            }}];
+            
+            // Add button text
+            const buttonText = figma.createText();
+            buttonText.name = "CTA Text";
+            buttonText.characters = layout.cta.text;
+            buttonText.fontSize = layout.cta.size;
+            buttonText.x = layout.cta.position.x + layout.cta.width/2;
+            buttonText.y = layout.cta.position.y + layout.cta.height/2;
+            buttonText.textAlignHorizontal = "CENTER";
+            buttonText.textAlignVertical = "CENTER";
+            
+            const textColor = hexToRgb(layout.cta.color);
+            buttonText.fills = [{{
+                type: 'SOLID',
+                color: {{ r: textColor.r/255, g: textColor.g/255, b: textColor.b/255 }}
+            }}];
+            
+            frame.appendChild(button);
+            frame.appendChild(buttonText);
+            }}
+            
+            // Select and zoom to the created frame
+            figma.currentPage.selection = [frame];
+            figma.viewport.scrollAndZoomIntoView([frame]);
+            
+            figma.closePlugin("Banner created successfully!");
+        }}
+        }};
+
+        function hexToRgb(hex) {{
+        const result = /^#?([a-f\\d]{{2}})([a-f\\d]{{2}})([a-f\\d]{{2}})$/i.exec(hex);
+        return result ? {{
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        }} : {{ r: 0, g: 0, b: 0 }};
+        }}'''
+        
+        return {
+            "manifest.json": json.dumps(manifest, indent=2),
+            "ui.html": ui_html,
+            "code.js": code_js
+        }
+
+
+
     def create_banner(self, user_input: str, logo_path: str = None, 
-                     width: int = 1200, height: int = 628, max_iterations: int = 3) -> str:
+                 width: int = 1200, height: int = 628, max_iterations: int = 3,
+                 output_format: str = "json") -> str:
         """
         Main method to create a banner ad using the multi-agent system
         """
@@ -424,7 +738,7 @@ Focus on:
                 # Refine design based on feedback
                 current_layout = self.refine_layout(current_layout, feedback)
             
-            # Step 5: Final result
+            # Step 5: Generate output based on format
             final_result = {
                 'objectives': objectives,
                 'background_description': background_description,
@@ -434,7 +748,16 @@ Focus on:
             }
             
             print("\n🎉 Banner creation completed!")
-            return json.dumps(final_result, indent=2, ensure_ascii=False)
+            
+            if output_format == "json":
+                return json.dumps(final_result, indent=2, ensure_ascii=False)
+            elif output_format == "svg":
+                return self.export_to_svg(current_layout, background_description, width, height, logo_path)
+            elif output_format == "figma":
+                plugin_files = self.export_to_figma_plugin(current_layout, background_description, width, height, logo_path)
+                return json.dumps(plugin_files, indent=2, ensure_ascii=False)
+            else:
+                raise ValueError(f"Unsupported output_format: {output_format}. Use 'json', 'svg', or 'figma'.")
             
         except Exception as e:
             print(f"❌ Error in banner creation: {str(e)}")

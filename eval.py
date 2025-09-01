@@ -1,5 +1,5 @@
 import os, argparse
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from tools.tool_utils import prepare_image_message, BOutput
@@ -19,7 +19,7 @@ if args.evaluator == "gpt5nano":
     llm = ChatOpenAI(
         model="gpt-5-nano",  # GPT-5-nano model
         openai_api_key=os.getenv("OPENAI_API_KEY"),
-        temperature=0.3, 
+        temperature=1, 
         max_tokens=2000,
         max_retries=2,
     )
