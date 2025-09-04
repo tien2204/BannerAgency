@@ -715,5 +715,354 @@
       ],
       "rationale": "Golden ratio proportions create naturally pleasing composition that feels balanced and harmonious."
     }
+  },
+  "modern_gradient_pattern": {
+    "description": "Modern gradient backgrounds with dynamic text placement and stylized elements",
+    "example_1200x628": {
+      "canvas": {"width": 1200, "height": 628},
+      "background": {
+        "type": "gradient",
+        "colors": ["#667eea", "#764ba2"],
+        "direction": "135deg",
+        "overlay_elements": [
+          {
+            "type": "circle",
+            "position": {"x": 900, "y": 100},
+            "radius": 150,
+            "fill": "rgba(255,255,255,0.1)",
+            "blur": "20px"
+          },
+          {
+            "type": "circle", 
+            "position": {"x": 200, "y": 400},
+            "radius": 100,
+            "fill": "rgba(255,255,255,0.05)",
+            "blur": "15px"
+          }
+        ]
+      },
+      "elements": [
+        {
+          "type": "headline",
+          "text": "Revolutionary AI Solution",
+          "position": {"x": 80, "y": 150},
+          "dimensions": {"width": 600, "height": 120},
+          "styling": {
+            "font_family": "Inter Bold",
+            "font_size": 56,
+            "font_weight": "800",
+            "color": "#FFFFFF",
+            "text_shadow": "0 4px 20px rgba(0,0,0,0.3)",
+            "line_height": 1.2,
+            "alignment": "left"
+          }
+        },
+        {
+          "type": "subheadline",
+          "text": "Transform your business with cutting-edge technology",
+          "position": {"x": 80, "y": 290},
+          "dimensions": {"width": 550, "height": 80},
+          "styling": {
+            "font_family": "Inter Medium",
+            "font_size": 28,
+            "font_weight": "500",
+            "color": "rgba(255,255,255,0.9)",
+            "line_height": 1.3,
+            "alignment": "left"
+          }
+        },
+        {
+          "type": "cta_button",
+          "text": "Get Started",
+          "position": {"x": 80, "y": 420},
+          "dimensions": {"width": 200, "height": 65},
+          "styling": {
+            "font_family": "Inter Bold",
+            "font_size": 20,
+            "font_weight": "700",
+            "color": "#667eea",
+            "background": "linear-gradient(135deg, #FFFFFF, #F8F9FA)",
+            "border_radius": 35,
+            "box_shadow": "0 10px 30px rgba(0,0,0,0.2)",
+            "hover_transform": "translateY(-2px)"
+          }
+        },
+        {
+          "type": "logo",
+          "position": {"x": 950, "y": 50},
+          "dimensions": {"width": 200, "height": 80},
+          "styling": {
+            "filter": "drop-shadow(0 4px 12px rgba(0,0,0,0.2))"
+          }
+        }
+      ],
+      "rationale": "Modern gradient with glassmorphism effects, high contrast typography, and professional spacing"
+    }
+  },
+  
+  "vibrant_geometric_pattern": {
+    "description": "Vibrant backgrounds with geometric shapes and bold typography",
+    "example_1200x628": {
+      "canvas": {"width": 1200, "height": 628},
+      "background": {
+        "type": "geometric",
+        "base_color": "#FF6B6B",
+        "shapes": [
+          {
+            "type": "triangle",
+            "points": "0,0 400,0 200,300",
+            "fill": "rgba(255,107,107,0.8)"
+          },
+          {
+            "type": "circle",
+            "position": {"x": 800, "y": 200},
+            "radius": 200,
+            "fill": "rgba(74,144,226,0.3)"
+          },
+          {
+            "type": "polygon",
+            "points": "900,400 1100,350 1200,500 1000,600",
+            "fill": "rgba(255,193,7,0.4)"
+          }
+        ]
+      },
+      "elements": [
+        {
+          "type": "headline",
+          "text": "SAVE 20%",
+          "position": {"x": 100, "y": 80},
+          "dimensions": {"width": 400, "height": 100},
+          "styling": {
+            "font_family": "Montserrat Black",
+            "font_size": 72,
+            "font_weight": "900",
+            "color": "#FFFFFF",
+            "text_shadow": "0 6px 20px rgba(0,0,0,0.4)",
+            "letter_spacing": "2px",
+            "alignment": "left"
+          }
+        },
+        {
+          "type": "subheadline",
+          "text": "ON ORGANIC PRODUCTS",
+          "position": {"x": 100, "y": 200},
+          "dimensions": {"width": 500, "height": 60},
+          "styling": {
+            "font_family": "Montserrat Bold",
+            "font_size": 32,
+            "font_weight": "700",
+            "color": "#2C3E50",
+            "alignment": "left"
+          }
+        },
+        {
+          "type": "badge",
+          "text": "Limited Time",
+          "position": {"x": 100, "y": 280},
+          "dimensions": {"width": 180, "height": 45},
+          "styling": {
+            "font_family": "Montserrat Medium",
+            "font_size": 16,
+            "font_weight": "600",
+            "color": "#FFFFFF",
+            "background": "#E74C3C",
+            "border_radius": 25,
+            "text_align": "center"
+          }
+        },
+        {
+          "type": "cta_button",
+          "text": "SHOP NOW",
+          "position": {"x": 100, "y": 380},
+          "dimensions": {"width": 180, "height": 65},
+          "styling": {
+            "font_family": "Montserrat Bold",
+            "font_size": 18,
+            "font_weight": "800",
+            "color": "#FFFFFF",
+            "background": "#2C3E50",
+            "border_radius": 8,
+            "box_shadow": "0 8px 25px rgba(44,62,80,0.3)"
+          }
+        }
+      ],
+      "rationale": "Bold geometric design with high-impact typography and vibrant color contrasts"
+    }
+  },
+
+  "elegant_minimal_pattern": {
+    "description": "Elegant minimal design with sophisticated typography and subtle accents",
+    "example_1200x628": {
+      "canvas": {"width": 1200, "height": 628},
+      "background": {
+        "type": "minimal",
+        "base_color": "#F8F9FA",
+        "accent_elements": [
+          {
+            "type": "line",
+            "start": {"x": 0, "y": 100},
+            "end": {"x": 300, "y": 100},
+            "stroke": "#E74C3C",
+            "stroke_width": 4
+          },
+          {
+            "type": "dot_pattern",
+            "area": {"x": 700, "y": 200, "width": 400, "height": 300},
+            "color": "rgba(52,73,94,0.05)",
+            "spacing": 20
+          }
+        ]
+      },
+      "elements": [
+        {
+          "type": "headline",
+          "text": "Premium Quality",
+          "position": {"x": 80, "y": 140},
+          "dimensions": {"width": 500, "height": 80},
+          "styling": {
+            "font_family": "Playfair Display",
+            "font_size": 54,
+            "font_weight": "700",
+            "color": "#2C3E50",
+            "letter_spacing": "-1px",
+            "alignment": "left"
+          }
+        },
+        {
+          "type": "subheadline",
+          "text": "Crafted with Precision and Care",
+          "position": {"x": 80, "y": 240},
+          "dimensions": {"width": 450, "height": 50},
+          "styling": {
+            "font_family": "Source Sans Pro",
+            "font_size": 24,
+            "font_weight": "400",
+            "color": "#7F8C8D",
+            "line_height": 1.4,
+            "alignment": "left"
+          }
+        },
+        {
+          "type": "feature_highlight",
+          "text": "• Premium Materials\n• Expert Craftsmanship\n• Lifetime Warranty",
+          "position": {"x": 80, "y": 320},
+          "dimensions": {"width": 300, "height": 120},
+          "styling": {
+            "font_family": "Source Sans Pro",
+            "font_size": 18,
+            "font_weight": "400",
+            "color": "#34495E",
+            "line_height": 1.8
+          }
+        },
+        {
+          "type": "cta_button",
+          "text": "Discover More",
+          "position": {"x": 80, "y": 480},
+          "dimensions": {"width": 180, "height": 55},
+          "styling": {
+            "font_family": "Source Sans Pro",
+            "font_size": 16,
+            "font_weight": "600",
+            "color": "#FFFFFF",
+            "background": "#E74C3C",
+            "border_radius": 4,
+            "box_shadow": "0 4px 15px rgba(231,76,60,0.3)"
+          }
+        }
+      ],
+      "rationale": "Sophisticated minimal design with elegant typography and subtle visual hierarchy"
+    }
+  },
+
+  "tech_futuristic_pattern": {
+    "description": "Tech-focused design with futuristic elements and modern typography",
+    "example_1200x628": {
+      "canvas": {"width": 1200, "height": 628},
+      "background": {
+        "type": "tech",
+        "base_gradient": ["#0F0F23", "#1a1a2e"],
+        "tech_elements": [
+          {
+            "type": "grid_lines",
+            "color": "rgba(116,185,255,0.1)",
+            "spacing": 50
+          },
+          {
+            "type": "glow_circle",
+            "position": {"x": 900, "y": 150},
+            "radius": 120,
+            "color": "rgba(116,185,255,0.2)",
+            "blur": 40
+          },
+          {
+            "type": "particles",
+            "count": 30,
+            "area": {"x": 600, "y": 0, "width": 600, "height": 628},
+            "color": "rgba(116,185,255,0.3)"
+          }
+        ]
+      },
+      "elements": [
+        {
+          "type": "headline",
+          "text": "AI REVOLUTION",
+          "position": {"x": 80, "y": 120},
+          "dimensions": {"width": 600, "height": 100},
+          "styling": {
+            "font_family": "Orbitron",
+            "font_size": 64,
+            "font_weight": "900",
+            "color": "#74B9FF",
+            "text_shadow": "0 0 20px rgba(116,185,255,0.5)",
+            "letter_spacing": "3px",
+            "alignment": "left"
+          }
+        },
+        {
+          "type": "subheadline",
+          "text": "Next-Generation Technology Solutions",
+          "position": {"x": 80, "y": 240},
+          "dimensions": {"width": 550, "height": 60},
+          "styling": {
+            "font_family": "Roboto",
+            "font_size": 28,
+            "font_weight": "300",
+            "color": "#DDD6FE",
+            "alignment": "left"
+          }
+        },
+        {
+          "type": "stats_box",
+          "elements": [
+            {"label": "99%", "desc": "Accuracy", "position": {"x": 80, "y": 340}},
+            {"label": "24/7", "desc": "Support", "position": {"x": 200, "y": 340}},
+            {"label": "AI", "desc": "Powered", "position": {"x": 320, "y": 340}}
+          ],
+          "styling": {
+            "font_family": "Orbitron",
+            "label_size": 32,
+            "desc_size": 14,
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "cta_button",
+          "text": "Launch Now",
+          "position": {"x": 80, "y": 450},
+          "dimensions": {"width": 200, "height": 60},
+          "styling": {
+            "font_family": "Orbitron",
+            "font_size": 18,
+            "font_weight": "700",
+            "color": "#0F0F23",
+            "background": "linear-gradient(135deg, #74B9FF, #0984E3)",
+            "border_radius": 30,
+            "box_shadow": "0 0 25px rgba(116,185,255,0.4)"
+          }
+        }
+      ],
+      "rationale": "Futuristic tech design with glowing effects and sci-fi typography"
+    }
   }
 }
