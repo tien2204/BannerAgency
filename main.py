@@ -314,8 +314,9 @@ Focus on:
             }
         }
     
-    def design_reviewer_agent(self, layout_spec: Dict[str, Any],
-                            width: int, height: int, iteration: int = 1) -> Dict[str, Any]:
+    def design_reviewer_agent(self, layout_spec: Dict[str, Any], background_description: str,
+                        width: int, height: int, iteration: int = 1, 
+                        svg_preview: str = None) -> Dict[str, Any]:
         """
         Design Reviewer Agent: Reviews and provides feedback on the design
         """
@@ -324,7 +325,33 @@ Focus on:
         system_prompt = self.prompts['design_reviewer'].replace('{width}', str(width)).replace('{height}', str(height))
         messages = [SystemMessage(content=system_prompt)]
         
-        content = [{"type": "text", "text": f"Review this banner design (iteration {iteration}):\n\nDimensions: {width}x{height}px\n\nLayout specification:\n{json.dumps(layout_spec, indent=2)}\n\nPlease provide feedback on positioning, readability, professional quality, and overall effectiveness."}]
+        content = [{"type": "text", "text": f"""Review this banner design (iteration {iteration}):
+
+    Dimensions: {width}x{height}px
+    Background: {background_description}
+
+    Layout specification:
+    {json.dumps(layout_spec, indent=2)}
+
+    Check for:
+    1. Is the user-requested quote present and prominent?
+    2. Are all elements positioned correctly without overlaps?
+    3. Is the logo visible and well-placed?
+    4. Does the design meet professional standards?
+
+    Provide feedback in JSON format with:
+    {{"approved": true/false, "issues": [...], "suggestions": [...]}}"""}]
+        
+        # Add SVG preview if available
+        if svg_preview:
+            # Convert SVG to base64 for image viewing
+            import base64
+            svg_b64 = base64.b64encode(svg_preview.encode()).decode()
+            content.append({
+                "type": "image_url", 
+                "image_url": {"url": f"data:image/svg+xml;base64,{svg_b64}"}
+            })
+            content.append({"type": "text", "text": "Above is the visual preview of the banner design."})
         
         messages.append(HumanMessage(content=content))
         
@@ -338,10 +365,9 @@ Focus on:
         except Exception as e:
             print(f"⚠️ Review error: {e}")
             return {
-                'overall_score': 7,
+                'approved': iteration >= 3,  # Auto-approve after 3 iterations
                 'issues': [],
-                'suggestions': [],
-                'approved': iteration >= 2  # Auto-approve after 2 iterations
+                'suggestions': []
             }
     
     def parse_feedback(self, response: str) -> Dict[str, Any]:
@@ -365,43 +391,74 @@ Focus on:
 
 
     
-    def export_to_svg(self, layout: Dict, background_desc: str, width: int, height: int, logo_path: str) -> str:
+    def export_to_svg(self, layout: Dict[str, Any], background_desc: str, width: int, height: int, logo_path: str) -> str:
+        """Generate SVG using actual layout specification"""
+        
         svg = f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
         
-        # Background with artistic gradient/particles (based on tech_futuristic)
-        svg += '<defs><linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0F0F23"/><stop offset="100%" stop-color="#1a1a2e"/></linearGradient></defs>'
-        svg += f'<rect width="{width}" height="{height}" fill="url(#bgGrad)"/>'
-        # Add particles as circles
-        import random
-        for _ in range(50):
-            x, y = random.randint(600, 1200), random.randint(0, 628)
-            svg += f'<circle cx="{x}" cy="{y}" r="2" fill="rgba(116,185,255,0.3)"/>'
-        # Grid lines
-        for i in range(0, width, 50):
-            svg += f'<line x1="{i}" y1="0" x2="{i}" y2="{height}" stroke="rgba(116,185,255,0.1)" stroke-width="1"/>'
-        for i in range(0, height, 50):
-            svg += f'<line x1="0" y1="{i}" x2="{width}" y2="{i}" stroke="rgba(116,185,255,0.1)" stroke-width="1"/>'
-        # Glow circle
-        svg += '<filter id="glow"><feGaussianBlur stdDeviation="40" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
-        svg += '<circle cx="900" cy="150" r="120" fill="rgba(116,185,255,0.2)" filter="url(#glow)"/>'
+        # Background
+        if "tech" in background_desc.lower() or "ai" in background_desc.lower():
+            # Tech background
+            svg += '''<defs>
+                <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#0F0F23"/>
+                    <stop offset="100%" stop-color="#1a1a2e"/>
+                </linearGradient>
+                <filter id="glow">
+                    <feGaussianBlur stdDeviation="4" result="blur"/>
+                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+            </defs>'''
+            svg += f'<rect width="{width}" height="{height}" fill="url(#bgGrad)"/>'
+            # Add tech grid
+            for i in range(0, width, 20):
+                svg += f'<line x1="{i}" y1="0" x2="{i}" y2="{height}" stroke="rgba(116,185,255,0.1)" stroke-width="0.5"/>'
+            for i in range(0, height, 20):
+                svg += f'<line x1="0" y1="{i}" x2="{width}" y2="{i}" stroke="rgba(116,185,255,0.1)" stroke-width="0.5"/>'
+        else:
+            # Simple background
+            svg += f'<rect width="{width}" height="{height}" fill="#f8f9fa"/>'
         
-        # Logo (base64 encode if path provided)
-        if logo_path:
-            with open(logo_path, "rb") as img_file:
-                base64_img = base64.b64encode(img_file.read()).decode('utf-8')
-            mime = guess_type(logo_path)[0]
-            logo_x, logo_y = 40, 40  # Top-left
-            logo_w, logo_h = 240, 90
-            svg += f'<image x="{logo_x}" y="{logo_y}" width="{logo_w}" height="{logo_h}" xlink:href="data:{mime};base64,{base64_img}" filter="drop-shadow(0 0 10px rgba(116,185,255,0.5))"/>'
+        # Render elements from actual layout
+        if 'headline' in layout:
+            hl = layout['headline']
+            svg += f'''<text x="{hl['position']['x']}" y="{hl['position']['y'] + hl['font_size']}" 
+                    font-family="{hl['font_family']}" font-size="{hl['font_size']}" 
+                    fill="{hl['color']}" text-anchor="start">{hl['text']}</text>'''
         
-        # Elements from layout (example; adapt to your layout_dict)
-        for elem in layout.get('elements', []):
-            if elem['type'] == 'headline':
-                svg += f'<text x="{elem["position"]["x"]}" y="{elem["position"]["y"] + elem["dimensions"]["height"]/2}" font-family="{elem["styling"]["font_family"]}" font-size="{elem["styling"]["font_size"]}" fill="{elem["styling"]["color"]}" font-weight="{elem["styling"]["font_weight"]}" text-anchor="start" style="text-shadow: {elem["styling"]["text_shadow"]};">{elem["text"]}</text>'
-            # Add similar for subheadline, cta (use <rect> for button bg + text)
-            if elem['type'] == 'cta_button':
-                svg += f'<rect x="{elem["position"]["x"]}" y="{elem["position"]["y"]}" width="{elem["dimensions"]["width"]}" height="{elem["dimensions"]["height"]}" rx="{elem["styling"]["border_radius"]}" fill="{elem["styling"]["background"]}" style="filter: drop-shadow({elem["styling"]["box_shadow"]});"/>'
-                svg += f'<text x="{elem["position"]["x"] + elem["dimensions"]["width"]/2}" y="{elem["position"]["y"] + elem["dimensions"]["height"]/2 + elem["styling"]["font_size"]/4}" font-family="{elem["styling"]["font_family"]}" font-size="{elem["styling"]["font_size"]}" fill="{elem["styling"]["color"]}" font-weight="{elem["styling"]["font_weight"]}" text-anchor="middle">{elem["text"]}</text>'
+        if 'subheadline' in layout:
+            sh = layout['subheadline'] 
+            svg += f'''<text x="{sh['position']['x']}" y="{sh['position']['y'] + sh['font_size']}" 
+                    font-family="{sh['font_family']}" font-size="{sh['font_size']}" 
+                    fill="{sh['color']}" text-anchor="start">{sh['text']}</text>'''
+        
+        if 'cta_button' in layout:
+            cta = layout['cta_button']
+            # Button background
+            svg += f'''<rect x="{cta['position']['x']}" y="{cta['position']['y']}" 
+                    width="{cta['dimensions']['width']}" height="{cta['dimensions']['height']}" 
+                    rx="{cta['border_radius']}" fill="{cta['background_color']}"/>'''
+            # Button text
+            text_x = cta['position']['x'] + cta['dimensions']['width'] // 2
+            text_y = cta['position']['y'] + cta['dimensions']['height'] // 2 + cta['font_size'] // 3
+            svg += f'''<text x="{text_x}" y="{text_y}" 
+                    font-family="{cta['font_family']}" font-size="{cta['font_size']}" 
+                    fill="{cta['color']}" text-anchor="middle">{cta['text']}</text>'''
+        
+        # Logo
+        if logo_path and os.path.exists(logo_path) and 'logo' in layout:
+            try:
+                import base64
+                from mimetypes import guess_type
+                with open(logo_path, "rb") as img_file:
+                    base64_img = base64.b64encode(img_file.read()).decode('utf-8')
+                mime = guess_type(logo_path)[0] or 'image/png'
+                logo = layout['logo']
+                svg += f'''<image x="{logo['position']['x']}" y="{logo['position']['y']}" 
+                        width="{logo['dimensions']['width']}" height="{logo['dimensions']['height']}" 
+                        xlink:href="data:{mime};base64,{base64_img}"/>'''
+            except Exception as e:
+                print(f"⚠️ Logo rendering error: {e}")
         
         svg += '</svg>'
         return svg
@@ -591,8 +648,8 @@ Focus on:
 
 
     def create_banner(self, user_input: str, logo_path: str = None, 
-                 width: int = 1200, height: int = 628, max_iterations: int = 3,
-                 output_format: str = "json") -> str:
+                       width: int = 1200, height: int = 628, max_iterations: int = 3,
+                       output_format: str = "json") -> str:
         """
         Main method to create a banner ad using the multi-agent system
         """
@@ -618,19 +675,24 @@ Focus on:
             for iteration in range(1, max_iterations + 1):
                 print(f"\n🔄 Design Iteration {iteration}")
                 
-                # Review design
+                # Generate SVG preview for visual review
+                svg_preview = self.export_to_svg(current_layout, background_description, width, height, logo_path)
+                
+                # Review design with visual preview
                 feedback = self.design_reviewer_agent(
-                    current_layout, width, height, iteration
+                    current_layout, background_description, width, height, iteration, svg_preview
                 )
                 
-                if (feedback.get('approved', False) and not feedback.get('issues')) or iteration == max_iterations:
+                if feedback.get('approved', False) or iteration == max_iterations:
                     print(f"✅ Design approved after {iteration} iteration(s)")
                     break
                 
                 # Refine design based on feedback
-                current_layout = self.refine_layout(current_layout, feedback)
+                if feedback.get('issues'):
+                    current_layout = self.refine_layout(current_layout, feedback)
+                    print(f"🔧 Applied {len(feedback['issues'])} refinements")
             
-            # Step 5: Generate output based on format
+            # Final result
             final_result = {
                 'objectives': objectives,
                 'background_description': background_description,
@@ -644,15 +706,12 @@ Focus on:
             if output_format == "json":
                 return json.dumps(final_result, indent=2, ensure_ascii=False)
             elif output_format == "svg":
-                return self.export_to_svg(current_layout, background_description, width, height, logo_path)
-            elif output_format == "figma":
-                plugin_files = self.export_to_figma_plugin(current_layout, background_description, width, height, logo_path)
-                return json.dumps(plugin_files, indent=2, ensure_ascii=False)
+                return self.export_to_svg_fixed(current_layout, background_description, width, height, logo_path)
             else:
-                raise ValueError(f"Unsupported output_format: {output_format}. Use 'json', 'svg', or 'figma'.")
-            
+                return json.dumps(final_result, indent=2, ensure_ascii=False)
+                
         except Exception as e:
-            print(f"❌ Error in banner creation: {str(e)}")
+            print(f"⌫ Error in banner creation: {str(e)}")
             return f"Error: {str(e)}"
     
     def refine_layout(self, layout_spec: Dict[str, Any], feedback: Dict[str, Any]) -> Dict[str, Any]:
