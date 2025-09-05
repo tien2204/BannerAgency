@@ -256,40 +256,20 @@ Focus on:
             return self.get_fallback_layout(width, height)
     
     def parse_layout_specification(self, response: str, width: int, height: int) -> Dict[str, Any]:
-        """Parse layout specification from foreground designer response"""
-        # Try to extract structured information from the response
-        layout = self.get_fallback_layout(width, height)
+        """Parse structured layout specification from LLM response"""
+        try:
+            # Tìm đoạn JSON trong response
+            start = response.find("{")
+            end = response.rfind("}")
+            if start != -1 and end != -1:
+                layout_json = response[start:end+1]
+                layout = json.loads(layout_json)
+                return layout
+        except Exception as e:
+            print(f"⚠️ Parse layout JSON error: {e}")
         
-        # Simple text parsing for common elements
-        lines = response.split('\n')
-        
-        for i, line in enumerate(lines):
-            line_lower = line.lower()
-            
-            # Look for headline text
-            if 'headline' in line_lower and ('text' in line_lower or ':' in line):
-                if ':' in line:
-                    text = line.split(':', 1)[-1].strip().strip('"\'')
-                    if text and len(text) < 100:  # Reasonable headline length
-                        layout['headline']['text'] = text
-            
-            # Look for CTA text
-            elif 'cta' in line_lower and ('text' in line_lower or 'button' in line_lower):
-                if ':' in line:
-                    text = line.split(':', 1)[-1].strip().strip('"\'')
-                    if text and len(text) < 30:  # Reasonable CTA length
-                        layout['cta']['text'] = text
-            
-            # Look for colors
-            elif '#' in line and len(line.split('#')) > 1:
-                color = '#' + line.split('#')[1][:6]
-                if len(color) == 7:  # Valid hex color
-                    if 'headline' in line_lower:
-                        layout['headline']['color'] = color
-                    elif 'cta' in line_lower or 'button' in line_lower:
-                        layout['cta']['background_color'] = color
-        
-        return layout
+        # Nếu thất bại → fallback
+        return self.get_fallback_layout(width, height)
     
     def get_fallback_layout(self, width: int, height: int) -> Dict[str, Any]:
         """Generate fallback layout based on dimensions"""
@@ -365,155 +345,120 @@ Focus on:
             }
     
     def parse_feedback(self, response: str) -> Dict[str, Any]:
-        """Parse feedback from design reviewer"""
-        feedback = {
-            'overall_score': 7,
-            'issues': [],
-            'suggestions': [],
-            'approved': False
+        """Parse structured JSON feedback from reviewer"""
+        try:
+            start = response.find("{")
+            end = response.rfind("}")
+            if start != -1 and end != -1:
+                feedback_json = response[start:end+1]
+                feedback = json.loads(feedback_json)
+                return feedback
+        except Exception as e:
+            print(f"⚠️ Parse feedback JSON error: {e}")
+
+        # fallback nếu parse thất bại
+        return {
+            "approved": False,
+            "issues": [],
+            "suggestions": []
         }
-        
-        # Check for approval keywords
-        response_lower = response.lower()
-        approval_words = ['approve', 'good', 'excellent', 'ready', 'complete']
-        feedback['approved'] = any(word in response_lower for word in approval_words)
-        
-        # Extract issues and suggestions
-        lines = response.split('\n')
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-                
-            line_lower = line.lower()
-            if any(word in line_lower for word in ['issue', 'problem', 'concern', 'error']):
-                feedback['issues'].append(line)
-            elif any(word in line_lower for word in ['suggest', 'recommend', 'improve', 'consider']):
-                feedback['suggestions'].append(line)
-        
-        return feedback
+
+
     
-    def export_to_svg(self, layout: Dict[str, Any], background_description: str, width: int, height: int, logo_path: str = None) -> str:
-        """Convert layout spec into comprehensive SVG code with logo support"""
+    def export_to_svg(self, layout: Dict[str, Any], background_description: str,
+                  width: int, height: int, logo_path: str = None) -> str:
+        """Convert layout spec into more artistic SVG with enhanced styles"""
         svg_elements = []
-        
-        # Enhanced background with gradient support
-        bg_color = "#f0f0f0"  # default
-        if "blue" in background_description.lower():
-            bg_color = "url(#blueGradient)"
-            svg_elements.append('''
-            <defs>
-                <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#3498db;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#2c3e50;stop-opacity:1" />
-                </linearGradient>
-            </defs>''')
-        elif "green" in background_description.lower():
-            bg_color = "url(#greenGradient)"
-            svg_elements.append('''
-            <defs>
-                <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#2ecc71;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#27ae60;stop-opacity:1" />
-                </linearGradient>
-            </defs>''')
-        
-        # Background rectangle
-        svg_elements.append(f'<rect width="{width}" height="{height}" fill="{bg_color}"/>')
-        
-        # Headline with proper text wrapping
+
+        # === Background: gradient mesh hoặc pattern ===
+        svg_elements.append(f'''
+        <defs>
+            <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#0f2027;stop-opacity:1" />
+                <stop offset="50%" style="stop-color:#203a43;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#2c5364;stop-opacity:1" />
+            </linearGradient>
+            <pattern id="dotPattern" width="40" height="40" patternUnits="userSpaceOnUse">
+                <circle cx="5" cy="5" r="2" fill="rgba(255,255,255,0.15)"/>
+            </pattern>
+            <filter id="textShadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="3" dy="3" stdDeviation="4" flood-opacity="0.3"/>
+            </filter>
+        </defs>
+        <rect width="{width}" height="{height}" fill="url(#bgGradient)"/>
+        <rect width="{width}" height="{height}" fill="url(#dotPattern)"/>
+        ''')
+
+        # === Headline ===
         if "headline" in layout:
             hl = layout["headline"]
             svg_elements.append(f'''
-            <text x="{hl["position"]["x"]}" y="{hl["position"]["y"]}" 
-                font-family="{hl["font"]}" font-size="{hl["size"]}px" 
-                fill="{hl["color"]}" text-anchor="start" 
+            <text x="{hl["position"]["x"]}" y="{hl["position"]["y"]}"
+                font-family="{hl.get("font", "Helvetica Neue")}" 
+                font-size="{hl["size"]}px" fill="{hl["color"]}"
+                filter="url(#textShadow)" text-anchor="{hl.get("alignment","start")}"
                 dominant-baseline="hanging">
                 {hl["text"]}
             </text>''')
-        
-        # Subheadline
+
+        # === Subheadline ===
         if "subheadline" in layout:
             sh = layout["subheadline"]
             svg_elements.append(f'''
-            <text x="{sh["position"]["x"]}" y="{sh["position"]["y"]}" 
-                font-family="{sh["font"]}" font-size="{sh["size"]}px" 
-                fill="{sh["color"]}" text-anchor="start" 
+            <text x="{sh["position"]["x"]}" y="{sh["position"]["y"]}"
+                font-family="{sh.get("font", "Open Sans")}" 
+                font-size="{sh["size"]}px" fill="{sh["color"]}"
+                text-anchor="{sh.get("alignment","start")}"
                 dominant-baseline="hanging">
                 {sh["text"]}
             </text>''')
-        
-        # CTA button with rounded corners and shadow
+
+        # === CTA button ===
         if "cta" in layout:
             cta = layout["cta"]
             svg_elements.append(f'''
             <defs>
-                <filter id="buttonShadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
-                </filter>
+                <linearGradient id="ctaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#ff512f;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#dd2476;stop-opacity:1" />
+                </linearGradient>
             </defs>
             <rect x="{cta["position"]["x"]}" y="{cta["position"]["y"]}" 
                 width="{cta["width"]}" height="{cta["height"]}" 
                 rx="{cta["border_radius"]}" ry="{cta["border_radius"]}"
-                fill="{cta["background_color"]}" 
-                filter="url(#buttonShadow)"
-                style="cursor:pointer"/>
+                fill="url(#ctaGradient)" filter="url(#buttonShadow)"/>
             <text x="{cta["position"]["x"] + cta["width"]/2}" 
                 y="{cta["position"]["y"] + cta["height"]/2}" 
                 font-family="{cta["font"]}" font-size="{cta["size"]}px" 
                 fill="{cta["color"]}" text-anchor="middle" 
-                dominant-baseline="central">
-                {cta["text"]}
-            </text>''')
-        
-        # Logo - Enhanced to handle actual logo image
+                dominant-baseline="central">{cta["text"]}</text>
+            ''')
+
+        # === Logo ===
         if "logo" in layout:
             logo = layout["logo"]
-            
-            # If logo_path exists and is valid, embed the image
             if logo_path and os.path.exists(logo_path):
-                try:
-                    # Convert logo to base64 for embedding in SVG
-                    logo_data = self.prepare_image_message(logo_path)
-                    svg_elements.append(f'''
-                    <image x="{logo["position"]["x"]}" y="{logo["position"]["y"]}" 
-                        width="{logo["width"]}" height="{logo["height"]}" 
-                        href="{logo_data}" 
-                        preserveAspectRatio="xMidYMid meet"/>''')
-                except Exception as e:
-                    print(f"Warning: Could not embed logo image: {e}")
-                    # Fallback to placeholder with better styling based on filename
-                    logo_text = self.extract_logo_name_from_path(logo_path)
-                    svg_elements.append(f'''
-                    <rect x="{logo["position"]["x"]}" y="{logo["position"]["y"]}" 
-                        width="{logo["width"]}" height="{logo["height"]}" 
-                        fill="#2c3e50" stroke="#34495e" stroke-width="2" rx="8"/>
-                    <text x="{logo["position"]["x"] + logo["width"]/2}" 
-                        y="{logo["position"]["y"] + logo["height"]/2}" 
-                        font-family="Arial Bold" font-size="{min(logo["width"]//8, logo["height"]//2)}" 
-                        fill="#ffffff" text-anchor="middle" 
-                        dominant-baseline="central">{logo_text}</text>''')
-            else:
-                # Default placeholder
+                logo_data = self.prepare_image_message(logo_path)
                 svg_elements.append(f'''
-                <rect x="{logo["position"]["x"]}" y="{logo["position"]["y"]}" 
+                <rect x="{logo["position"]["x"]-10}" y="{logo["position"]["y"]-10}" 
+                    width="{logo["width"]+20}" height="{logo["height"]+20}" 
+                    rx="12" ry="12" fill="rgba(255,255,255,0.6)"/>
+                <image x="{logo["position"]["x"]}" y="{logo["position"]["y"]}" 
                     width="{logo["width"]}" height="{logo["height"]}" 
-                    fill="#cccccc" stroke="#999999" stroke-width="1" rx="3"/>
-                <text x="{logo["position"]["x"] + logo["width"]/2}" 
-                    y="{logo["position"]["y"] + logo["height"]/2}" 
-                    font-family="Arial" font-size="12" 
-                    fill="#666666" text-anchor="middle" 
-                    dominant-baseline="central">LOGO</text>''')
-        
-        # Combine all elements
-        svg_content = ''.join(svg_elements)
-        
+                    href="{logo_data}" preserveAspectRatio="xMidYMid meet"/>''')
+            else:
+                svg_elements.append(f'''
+                <text x="{logo["position"]["x"]}" y="{logo["position"]["y"]}" 
+                    font-family="Arial Black" font-size="28" 
+                    fill="#ffffff">LOGO</text>''')
+
+        # === Wrap SVG ===
         return f'''<?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-            width="{width}" height="{height}" 
-            viewBox="0 0 {width} {height}">
-            {svg_content}
+            width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+            {''.join(svg_elements)}
         </svg>'''
+
 
     def extract_logo_name_from_path(self, logo_path: str) -> str:
         """Extract a display name from logo file path"""
@@ -731,7 +676,7 @@ Focus on:
                     current_layout, width, height, iteration
                 )
                 
-                if feedback.get('approved', False) or iteration == max_iterations:
+                if (feedback.get('approved', False) and not feedback.get('issues')) or iteration == max_iterations:
                     print(f"✅ Design approved after {iteration} iteration(s)")
                     break
                 
@@ -764,49 +709,33 @@ Focus on:
             return f"Error: {str(e)}"
     
     def refine_layout(self, layout_spec: Dict[str, Any], feedback: Dict[str, Any]) -> Dict[str, Any]:
-        """Refine layout based on feedback"""
-        refined_layout = json.loads(json.dumps(layout_spec))  # Deep copy
-        
-        issues = feedback.get('issues', [])
-        suggestions = feedback.get('suggestions', [])
-        
-        for issue in issues + suggestions:
-            issue_lower = issue.lower()
-            
-            # Font size adjustments
-            if 'font' in issue_lower and ('size' in issue_lower or 'larger' in issue_lower or 'smaller' in issue_lower):
-                for element in ['headline', 'subheadline']:
-                    if element in refined_layout:
-                        current_size = refined_layout[element].get('size', 24)
-                        if 'larger' in issue_lower:
-                            refined_layout[element]['size'] = min(current_size * 1.2, 72)
-                        elif 'smaller' in issue_lower:
-                            refined_layout[element]['size'] = max(current_size * 0.8, 12)
-            
-            # Position adjustments
-            elif 'position' in issue_lower or 'move' in issue_lower:
-                for element in refined_layout:
-                    if isinstance(refined_layout[element], dict) and 'position' in refined_layout[element]:
-                        # Small positional adjustments
-                        if 'down' in issue_lower:
-                            refined_layout[element]['position']['y'] += 20
-                        elif 'up' in issue_lower:
-                            refined_layout[element]['position']['y'] = max(10, refined_layout[element]['position']['y'] - 20)
-                        elif 'right' in issue_lower:
-                            refined_layout[element]['position']['x'] += 20
-                        elif 'left' in issue_lower:
-                            refined_layout[element]['position']['x'] = max(10, refined_layout[element]['position']['x'] - 20)
-            
-            # CTA improvements
-            elif 'cta' in issue_lower or 'button' in issue_lower:
-                if 'cta' in refined_layout:
-                    if 'larger' in issue_lower:
-                        refined_layout['cta']['width'] = min(refined_layout['cta'].get('width', 120) * 1.3, 250)
-                        refined_layout['cta']['height'] = min(refined_layout['cta'].get('height', 40) * 1.2, 60)
-                    elif 'prominent' in issue_lower or 'visible' in issue_lower:
-                        refined_layout['cta']['background_color'] = '#E74C3C'  # More prominent red
-        
-        return refined_layout
+        refined = json.loads(json.dumps(layout_spec))  # deep copy
+
+        for issue in feedback.get("issues", []):
+            elem = issue.get("element")
+            action = issue.get("action")
+            params = issue.get("parameters", {})
+
+            if elem not in refined:
+                continue
+
+            if action == "resize":
+                refined[elem]["width"] = params.get("width", refined[elem].get("width"))
+                refined[elem]["height"] = params.get("height", refined[elem].get("height"))
+            elif action == "reposition":
+                refined[elem]["position"]["x"] = params.get("x", refined[elem]["position"]["x"])
+                refined[elem]["position"]["y"] = params.get("y", refined[elem]["position"]["y"])
+            elif action == "recolor":
+                refined[elem]["color"] = params.get("color", refined[elem].get("color"))
+            elif action == "stylechange":
+                if "font" in params:
+                    refined[elem]["font"] = params["font"]
+            elif action == "retext":
+                if "text" in params:
+                    refined[elem]["text"] = params["text"]
+
+        return refined
+
 
 def main():
     """Example usage"""
