@@ -6,18 +6,20 @@ from dotenv import load_dotenv
 from typing import Dict, Any
 import base64
 import cairosvg
+import requests
 from mimetypes import guess_type
 
 # Load environment variables
 load_dotenv()
 
 class BannerAgent:
+
     def __init__(self, model_name="gpt-5-nano"):
         llm_kwargs = {
             "model": model_name,
             "openai_api_key": os.getenv("OPENAI_API_KEY"),
             "max_retries": 3,
-            "temperature": 1.0,  # <-- THÊM DÒNG NÀY ĐỂ SỬA LỖI
+            "temperature": 1.0,
             "model_kwargs": {
                 # Sửa cảnh báo UserWarning: chuyển max_completion_tokens vào đây
                 # và đổi tên thành max_tokens theo chuẩn của OpenAI API
@@ -25,30 +27,36 @@ class BannerAgent:
             }
         }
 
-        # Xóa tham số không còn hợp lệ ra khỏi khởi tạo chính
-        # llm_kwargs.pop("max_completion_tokens", None) 
-
         self.llm = ChatOpenAI(**llm_kwargs)
+        self.json_llm = self.llm.bind(
+            response_format={"type": "json_object"}
+        )
+
         self.load_prompts()
     
     def load_prompts(self):
         """Load all system prompts"""
         try:
-            from prompts.strategist_prompt import strategist_system_prompt
+            from prompts.strategist_prompt import strategist_system_prompt, strategist_context_prompt
             from prompts.background_designer_prompt import background_designer_system_prompt, background_designer_context_prompt
             from prompts.foreground_designer_prompt import foreground_designer_system_prompt, foreground_designer_context_prompt
             from prompts.design_reviewer_prompt import system_prompt as reviewer_system_prompt
             from prompts.developer_prompt import developer_prompt
             
             self.prompts = {
-                'strategist': strategist_system_prompt,
-                'background_designer': background_designer_system_prompt,
-                'background_designer_context': background_designer_context_prompt,
-                'foreground_designer': foreground_designer_system_prompt,
-                'foreground_designer_context': foreground_designer_context_prompt,
-                'design_reviewer': reviewer_system_prompt,
-                'developer': developer_prompt
-            }
+            'strategist_context_prompt': strategist_context_prompt,    
+            'strategist_system_prompt': strategist_system_prompt,
+            
+            
+            'background_designer_system_prompt': background_designer_system_prompt,
+            'background_designer_context_prompt': background_designer_context_prompt,
+            
+            'foreground_designer_system_prompt': foreground_designer_system_prompt,
+            'foreground_designer_context_prompt': foreground_designer_context_prompt,
+            
+            'design_reviewer': reviewer_system_prompt,
+            'developer': developer_prompt
+        }
             print("✅ Loaded prompts from files")
         except ImportError as e:
             print(f"Warning: Could not load prompts: {e}")
@@ -122,39 +130,56 @@ Focus on:
     
     def strategist_agent(self, user_input: str, logo_path: str = None) -> Dict[str, Any]:
         """
-        Strategist agent: Analyzes requirements and sets banner objectives
+        Strategist Agent: Analyzes requirements and logo image, then returns a structured
+        JSON object containing the creative direction (theme, mood, color_palette).
         """
         print("🎯 Strategist Agent: Analyzing requirements...")
         
-        messages = [SystemMessage(content=self.prompts['strategist'])]
+        # Sử dụng prompt hệ thống mới, yêu cầu output JSON
+        system_prompt = self.prompts['strategist_system_prompt']
         
-        content = [{"type": "text", "text": f"Analyze this banner request and provide objectives:\n\nUser request: {user_input}"}]
+        # Xây dựng context prompt mới, bao gồm cả user_input và logo_path
+        context_text = self.prompts['strategist_context_prompt'].format(
+            user_input=user_input,
+            logo_path=logo_path if logo_path else "No logo provided."
+        )
         
+        content = [{"type": "text", "text": context_text}]
+        
+        # Thêm ảnh logo vào message nếu có
         if logo_path and os.path.exists(logo_path):
             logo_data = self.prepare_image_message(logo_path)
             content.extend([
-                {"type": "text", "text": "\nLogo image for reference:"},
+                {"type": "text", "text": "\nAnalyze the color scheme from this logo:"},
                 {"type": "image_url", "image_url": {"url": logo_data}}
             ])
         
-        messages.append(HumanMessage(content=content))
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=content)
+        ]
         
         try:
-            response = self.llm.invoke(messages)
+            # Quan trọng: Dùng self.json_llm để bắt buộc output là JSON
+            response = self.json_llm.invoke(messages)
             
-            # Parse objectives from response
-            objectives = self.parse_objectives(response.content)
+            # Chuyển đổi chuỗi JSON trả về thành từ điển Python
+            objectives = json.loads(response.content)
             
-            print(f"✅ Objectives set: {objectives}")
+            print(f"✅ Strategist objectives set: {objectives}")
             return objectives
             
         except Exception as e:
             print(f"⚠️ Strategist error: {e}")
-            # Return default objectives
+            # Fallback an toàn, trả về một dict rỗng để không làm sập hệ thống
             return {
-                'purpose': 'Brand Awareness',
-                'audience': 'General Public',
-                'mood': 'Professional'
+                "theme": "General",
+                "mood": "Professional",
+                "color_palette": {
+                    "background": "#F0F0F0",
+                    "text": "#000000",
+                    "accent": "#007BFF"
+                }
             }
     
     def parse_objectives(self, response: str) -> Dict[str, str]:
@@ -178,85 +203,77 @@ Focus on:
         
         return objectives
     
-    def background_designer_agent(self, user_input: str, objectives: Dict[str, Any], 
-                                logo_path: str = None, width: int = 1200, height: int = 628) -> str:
+   
+    def background_designer_agent(self, theme: str, mood: str, color_palette: Dict[str, str]) -> Dict[str, Any]:
         """
-        Background Designer Agent: Creates or selects background images
+        Background Designer Agent: Generates a structured JSON for the background
+        based on the creative direction provided by the Strategist.
         """
-        print("🎨 Background Designer Agent: Working on background...")
+        print("🎨 Background Designer Agent: Designing background structure...")
+        system_prompt = self.prompts['background_designer_system_prompt']
         
-        # Format context if available
-        context_prompt = ""
-        if 'background_designer_context' in self.prompts:
-            context_prompt = self.prompts['background_designer_context'].format(
-                user_input=user_input,
-                purpose=objectives.get('purpose', ''),
-                audience=objectives.get('audience', ''),
-                mood=objectives.get('mood', '')
-            )
+        # Dùng context prompt mới, chỉ chứa các thông tin cần thiết
+        context_prompt = self.prompts['background_designer_context_prompt'].format(
+            theme=theme,
+            mood=mood,
+            color_palette=str(color_palette) # Chuyển dict thành chuỗi để đưa vào prompt
+        )
         
-        system_prompt = self.prompts['background_designer'] + "\n\n" + context_prompt
-        messages = [SystemMessage(content=system_prompt)]
-        
-        content = [{"type": "text", "text": f"Create background design description for banner ({width}x{height}px):\n\nRequirements: {user_input}\nObjectives: {objectives}"}]
-        
-        if logo_path and os.path.exists(logo_path):
-            logo_data = self.prepare_image_message(logo_path)
-            content.extend([
-                {"type": "text", "text": "\nConsider this logo for color compatibility:"},
-                {"type": "image_url", "image_url": {"url": logo_data}}
-            ])
-        
-        messages.append(HumanMessage(content=content))
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=context_prompt)
+        ]
         
         try:
-            response = self.llm.invoke(messages)
-            print("✅ Background design completed")
-            return response.content
+            # Dùng self.json_llm để bắt buộc output là JSON
+            response = self.json_llm.invoke(messages)
+            structure = json.loads(response.content)
+            print(f"✅ Background structure designed: {structure}")
+            return structure
         except Exception as e:
-            print(f"⚠️ Background designer error: {e}")
-            return f"Modern gradient background suitable for {objectives.get('mood', 'professional')} banner"
+            print(f"⚠️ Background Designer error: {e}")
+            # Fallback an toàn: trả về một nền trắng đặc
+            return {
+            "base_layer": { "type": "solid", "colors": ["#FFFFFF"] },
+            "overlay_layer": { "type": "none" }
+            }
     
-    def foreground_designer_agent(self, user_input: str, objectives: Dict[str, Any],
-                                background_description: str, width: int, height: int) -> Dict[str, Any]:
+ 
+    def foreground_designer_agent(self, user_input: str, objectives: Dict[str, Any], 
+                                    width: int, height: int) -> Dict[str, Any]:
         """
-        Foreground Designer Agent: Creates layout and typography specifications
+        Foreground Designer Agent: Creates layout and typography specifications,
+        using the color palette from the objectives.
         """
         print("📝 Foreground Designer Agent: Designing layout...")
         
-        # Format context if available
-        context_prompt = ""
-        if 'foreground_designer_context' in self.prompts:
-            context_prompt = self.prompts['foreground_designer_context'].format(
-                width=width,
-                height=height,
-                user_input=user_input,
-                purpose=objectives.get('purpose', ''),
-                audience=objectives.get('audience', ''),
-                mood=objectives.get('mood', '')
-            )
+        # Lấy các thông tin từ `objectives` mới
+        color_palette = objectives.get('color_palette', {})
+        theme = objectives.get('theme', 'general')
+        mood = objectives.get('mood', 'professional')
+
+        system_prompt = self.prompts.get('foreground_designer_system_prompt')
         
-        system_prompt = self.prompts['foreground_designer'] + "\n\n" + context_prompt
-        messages = [SystemMessage(content=system_prompt)]
-        
-        content = [{"type": "text", "text": f"Design foreground layout for {width}x{height}px banner:\n\nRequirements: {user_input}\nObjectives: {objectives}\nBackground: {background_description}\n\nPlease provide specific layout specifications including text content, fonts, sizes, colors, and positions."}]
-        
-        messages.append(HumanMessage(content=content))
+        # Dùng context prompt mới, truyền các giá trị từ `objectives`
+        context_prompt = self.prompts.get('foreground_designer_context_prompt').format(
+            width=width,
+            height=height,
+            user_input=user_input,
+            theme=theme,
+            mood=mood,
+            color_palette=str(color_palette)
+        )
+
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=context_prompt)
+        ]
         
         try:
-            response = self.llm.invoke(messages)
-            
-            # THÊM DÒNG NÀY ĐỂ GỠ LỖI
-            print("--- Raw Foreground Designer Output ---")
-            print(response.content)
-            print("------------------------------------")
-
-            # Parse layout specifications
+            response = self.json_llm.invoke(messages)
             layout_spec = self.parse_layout_specification(response.content, width, height)
-            
             print("✅ Foreground layout designed")
             return layout_spec
-            
         except Exception as e:
             print(f"⚠️ Foreground designer error: {e}")
             return self.get_fallback_layout(width, height)
@@ -387,76 +404,124 @@ Focus on:
         }
 
 
-    def export_to_svg(self, layout: Dict[str, Any], background_desc: str, width: int, height: int, logo_path: str) -> str:
+    def export_to_svg(self, layout: Dict[str, Any], background_structure: Dict[str, Any], width: int, height: int, logo_path: str) -> str:
         """
-        Generate SVG using actual layout specification, with support for multi-line text.
+        Generate SVG with embedded Google Fonts for consistent rendering.
+        Includes error handling for font fetching.
         """
+        print("🎨 Generating SVG with embedded fonts...")
+        
+        # --- PHẦN 1: Tải và nhúng Google Fonts ---
+        fonts_to_embed = {
+            "Orbitron": "https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap",
+            "Roboto": "https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+        }
+        font_styles = ""
+        try:
+            # Thêm user-agent để giả lập trình duyệt, tránh bị Google chặn
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
+            for font_name, url in fonts_to_embed.items():
+                response = requests.get(url, headers=headers)
+                if response.status_code == 200:
+                    font_styles += response.text
+                    print(f"✅ Successfully fetched font: {font_name}")
+                else:
+                    print(f"⚠️ Failed to fetch font {font_name}. Status code: {response.status_code}")
+        except ImportError:
+            print("⚠️ 'requests' library not found. Cannot embed fonts. Please run 'pip install requests'.")
+        except Exception as e:
+            print(f"⚠️ An error occurred during font fetching: {e}")
+        # --- Kết thúc Phần 1 ---
+
+        # Bắt đầu chuỗi SVG
         svg = f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+        
+        # Thêm thẻ <defs> và <style> để chứa định nghĩa font và gradient
+        svg += f'<defs><style>{font_styles}</style>'
 
-        # Background
-        if "tech" in background_desc.lower() or "ai" in background_desc.lower():
-            svg += f'''<defs><linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0F0F23"/><stop offset="100%" stop-color="#1a1a2e"/></linearGradient></defs><rect width="{width}" height="{height}" fill="url(#bgGrad)"/><rect width="{width}" height="{height}" fill="url(#bgGrad)"/>'''
-            for i in range(0, width, 20):
-                svg += f'<line x1="{i}" y1="0" x2="{i}" y2="{height}" stroke="rgba(116,185,255,0.1)" stroke-width="0.5"/>'
-            for i in range(0, height, 20):
-                svg += f'<line x1="0" y1="{i}" x2="{width}" y2="{i}" stroke="rgba(116,185,255,0.1)" stroke-width="0.5"/>'
+        base_layer = background_structure.get("base_layer", {"type": "solid", "colors": ["#FFFFFF"]})
+        if base_layer.get("type") == "gradient" and len(base_layer.get("colors", [])) >= 2:
+            colors = base_layer["colors"]
+            svg += f'<linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="{colors[0]}"/><stop offset="100%" stop-color="{colors[1]}"/></linearGradient>'
+            svg += '</defs>'
+            svg += f'<rect width="{width}" height="{height}" fill="url(#bgGrad)"/>'
         else:
-            svg += f'<rect width="{width}" height="{height}" fill="#f8f9fa"/>'
+            color = base_layer.get("colors", ["#FFFFFF"])[0]
+            svg += '</defs>'
+            svg += f'<rect width="{width}" height="{height}" fill="{color}"/>'
 
-        # --- TEXT RENDERING LOGIC (UPGRADED) ---
-        def render_text(element_name, default_font_size):
-            if element_name not in layout or not layout.get(element_name):
-                return ""
+        # 2. Vẽ Overlay Layer từ JSON
+        overlay_layer = background_structure.get("overlay_layer")
+        if overlay_layer and overlay_layer.get("type") != "none":
+            overlay_type = overlay_layer.get("type")
+            color = overlay_layer.get("color", "#FFFFFF")
+            opacity = overlay_layer.get("opacity", 0.1)
             
+            pattern_svg = ""
+            # Ánh xạ 'type' từ JSON sang hàm vẽ tương ứng
+            if overlay_type in ["grid", "circuitry"]:
+                for i in range(0, width, 20):
+                    pattern_svg += f'<line x1="{i}" y1="0" x2="{i}" y2="{height}" stroke="{color}" stroke-opacity="{opacity}" stroke-width="0.5"/>'
+                for i in range(0, height, 20):
+                    pattern_svg += f'<line x1="0" y1="{i}" x2="{width}" y2="{i}" stroke="{color}" stroke-opacity="{opacity}" stroke-width="0.5"/>'
+            elif overlay_type in ["organic_shapes", "subtle_waves"]:
+                for _ in range(15):
+                    import random
+                    x, y = random.randint(0, width), random.randint(0, height)
+                    scale = random.uniform(0.5, 1.2)
+                    # Sử dụng đường path SVG cho hình dạng hữu cơ
+                    pattern_svg += f'<path transform="translate({x}, {y}) scale({scale})" fill="{color}" fill-opacity="{opacity}" d="M15.1,3.1C14,1.2,12.3,0,10,0C7.7,0,6,1.2,4.9,3.1C3.8,5,3.8,7,4.9,8.9l-4,6.9C0.3,16.7,0,17.9,0,19c0,3.3,2.7,6,6,6 c1.1,0,2.3-0.3,3.1-0.9l6.9-4c1.9,1.1,3.9,1.1,5.8,0l6.9,4c0.8,0.6,2,0.9,3.1,0.9c3.3,0,6-2.7,6-6c0-1.1-0.3-2.3-0.9-3.1l-4-6.9 C26.2,7,26.2,5,25.1,3.1z"/>'
+            
+            svg += pattern_svg
+
+        # --- PHẦN 2: Render Text với font đã được nhúng ---
+        def render_text(element_name, default_font_size):
+            if element_name not in layout or not layout.get(element_name): return ""
             elem = layout[element_name]
             text_content = elem.get('text', '')
-            # Nếu text là list (đã được AI chia sẵn), nối lại. Nếu là string, giữ nguyên.
-            if isinstance(text_content, list):
-                lines = text_content
-            else: # Tự chia nếu AI chưa chia
-                # Ước tính số ký tự mỗi dòng dựa trên font size và chiều rộng banner
-                chars_per_line = int((width * 0.9) / (elem.get('font_size', default_font_size) * 0.6))
-                import textwrap
-                lines = textwrap.wrap(text_content, width=chars_per_line if chars_per_line > 0 else 20)
-
+            lines = text_content if isinstance(text_content, list) else [text_content]
+            
             font_size = elem.get('font_size', default_font_size)
             x = elem.get('position', {}).get('x', 10)
             y = elem.get('position', {}).get('y', font_size)
             
-            text_svg = f'<text x="{x}" y="{y}" font-family="{elem.get("font_family", "Arial")}" font-size="{font_size}" fill="{elem.get("color", "#FFFFFF")}">'
+            # Thêm font-weight và font-family dự phòng (sans-serif)
+            font_weight = "700" if element_name == 'headline' else "400"
+            font_family = elem.get("font_family", "Arial")
+            
+            text_svg = f'<text x="{x}" y="{y}" font-family="{font_family}, sans-serif" font-size="{font_size}" fill="{elem.get("color", "#FFFFFF")}" font-weight="{font_weight}">'
             for i, line in enumerate(lines):
-                # dy="1.2em" để tạo khoảng cách giữa các dòng
                 text_svg += f'<tspan x="{x}" dy="{ "1.2em" if i > 0 else 0 }">{line}</tspan>'
             text_svg += '</text>'
             return text_svg
 
         svg += render_text('headline', 28)
         svg += render_text('subheadline', 16)
-        # --- END OF UPGRADED TEXT LOGIC ---
+        # --- Kết thúc Phần 2 ---
 
+        # CTA Button
         if 'cta_button' in layout and layout.get('cta_button'):
             cta = layout['cta_button']
-            pos = cta.get('position', {})
-            dims = cta.get('dimensions', {})
-            font_size = cta.get('font_size', 14)
-            svg += f'''<rect x="{pos.get('x', 0)}" y="{pos.get('y', 0)}" width="{dims.get('width', 100)}" height="{dims.get('height', 40)}" rx="{cta.get('border_radius', 5)}" fill="{cta.get('background_color', '#007BFF')}"/>'''
-            text_x = pos.get('x', 0) + dims.get('width', 100) // 2
-            text_y = pos.get('y', 0) + dims.get('height', 40) // 2 + font_size // 3
-            svg += f'''<text x="{text_x}" y="{text_y}" font-family="{cta.get('font_family', 'Arial')}" font-size="{font_size}" fill="{cta.get('color', '#FFFFFF')}" text-anchor="middle">{cta.get('text', '')}</text>'''
+            pos, dims, font_size = cta.get('position', {}), cta.get('dimensions', {}), cta.get('font_size', 14)
+            font_family = cta.get('font_family', 'Arial')
+            
+            svg += f'<rect x="{pos.get("x", 0)}" y="{pos.get("y", 0)}" width="{dims.get("width", 100)}" height="{dims.get("height", 40)}" rx="{cta.get("border_radius", 5)}" fill="{cta.get("background_color", "#007BFF")}"/>'
+            text_x, text_y = pos.get('x', 0) + dims.get('width', 100) // 2, pos.get('y', 0) + dims.get('height', 40) // 2 + font_size // 3
+            svg += f'<text x="{text_x}" y="{text_y}" font-family="{font_family}, sans-serif" font-size="{font_size}" fill="{cta.get("color", "#FFFFFF")}" text-anchor="middle" font-weight="700">{cta.get("text", "")}</text>'
 
+        # Logo
         if logo_path and os.path.exists(logo_path) and 'logo' in layout and layout.get('logo'):
             try:
                 with open(logo_path, "rb") as img_file:
                     base64_img = base64.b64encode(img_file.read()).decode('utf-8')
                 mime = guess_type(logo_path)[0] or 'image/png'
-                logo = layout['logo']
-                pos = logo.get('position', {})
-                dims = logo.get('dimensions', {})
-                svg += f'''<image x="{pos.get('x', 0)}" y="{pos.get('y', 0)}" width="{dims.get('width', 80)}" height="{dims.get('height', 30)}" xlink:href="data:{mime};base64,{base64_img}"/>'''
+                logo, pos, dims = layout['logo'], layout['logo'].get('position', {}), layout['logo'].get('dimensions', {})
+                svg += f'<image x="{pos.get("x", 0)}" y="{pos.get("y", 0)}" width="{dims.get("width", 80)}" height="{dims.get("height", 30)}" xlink:href="data:{mime};base64,{base64_img}"/>'
             except Exception as e:
                 print(f"⚠️ Logo rendering error: {e}")
         
         svg += '</svg>'
+        print("✅ SVG generation complete with embedded fonts.")
         return svg
 
 
@@ -644,10 +709,10 @@ Focus on:
 
 
     def create_banner(self, user_input: str, logo_path: str = None,
-                   width: int = 1200, height: int = 628, max_iterations: int = 3,
-                   output_format: str = "json") -> str:
+                    width: int = 1200, height: int = 628, max_iterations: int = 3,
+                    output_format: str = "json") -> str:
         """
-        Main method to create a banner ad using the multi-agent system.
+        Main method to create a banner ad using the new, flexible multi-agent system.
         """
         print(f"🚀 Starting Banner Creation Process...")
         print(f"📏 Dimensions: {width}x{height}px")
@@ -655,77 +720,86 @@ Focus on:
         try:
             # Step 1: Strategic Planning
             objectives = self.strategist_agent(user_input, logo_path)
+            theme = objectives.get("theme", "general")
+            mood = objectives.get("mood", "neutral")
+            color_palette = objectives.get("color_palette", {})
+            print(f"🎯 Strategist Agent: Theme='{theme}', Colors={color_palette}")
 
             # Step 2: Background Design
-            background_description = self.background_designer_agent(
-                user_input, objectives, logo_path, width, height
-            )
+            background_structure = self.background_designer_agent(theme, mood, color_palette)
+            print(f"🎨 Background Designer Agent: Generated structure: {background_structure}")
 
             # Step 3: Foreground Design
-            layout_spec = self.foreground_designer_agent(
-                user_input, objectives, background_description, width, height
-            )
+            # SỬA LỖI: Đã xóa tham số thứ 3 thừa thãi
+            layout_spec = self.foreground_designer_agent(user_input, objectives, width, height)
+            
+            # Gộp color_palette vào layout_spec để tiện sử dụng
+            if 'color_palette' not in layout_spec:
+                layout_spec['color_palette'] = color_palette
 
             # Step 4: Iterative Design Review and Refinement
             current_layout = layout_spec
+            final_svg_content = "" # Biến để lưu trữ SVG cuối cùng
+
             for iteration in range(1, max_iterations + 1):
                 print(f"\n🔄 Design Iteration {iteration}")
 
-                # Generate SVG preview string
-                svg_preview_str = self.export_to_svg(current_layout, background_description, width, height, logo_path)
+                svg_content = self.export_to_svg(current_layout, background_structure, width, height, logo_path)
+                final_svg_content = svg_content
 
-                # Convert SVG string to PNG bytes in memory
+                # Convert SVG string to PNG bytes for review
                 try:
-                    png_bytes = cairosvg.svg2png(bytestring=svg_preview_str.encode('utf-8'))
+                    png_bytes = cairosvg.svg2png(bytestring=svg_content.encode('utf-8'))
+                    png_preview_b64 = base64.b64encode(png_bytes).decode('utf-8')
                 except Exception as convert_error:
-                    print(f"⚠️ Error converting SVG to PNG: {convert_error}")
-                    # If conversion fails, we can't send a preview. Skip to next iteration or break.
-                    # For simplicity, we'll approve to avoid an infinite loop on conversion errors.
+                    print(f"⚠️ Error converting SVG to PNG: {convert_error}. Approving to avoid loop.")
                     feedback = {'approved': True}
                 else:
-                    # Encode PNG bytes to base64 string for the API
-                    png_preview_b64 = base64.b64encode(png_bytes).decode('utf-8')
-
-                    # Review design with the generated PNG visual preview
+                    # Review design with the visual preview
+                    # SỬA LỖI: Truyền `background_structure` dưới dạng chuỗi JSON để Reviewer có thể đọc
+                    background_info_for_reviewer = json.dumps(background_structure)
                     feedback = self.design_reviewer_agent(
-                        user_input, current_layout, background_description, width, height, iteration, png_preview_b64
+                        user_input, current_layout, background_info_for_reviewer, width, height, iteration, png_preview_b64
                     )
 
-                if feedback.get('approved', False) or iteration == max_iterations:
+                if feedback.get('approved', False):
                     print(f"✅ Design approved after {iteration} iteration(s)")
                     break
+                
+                if iteration == max_iterations:
+                    print(f"✅ Reached max iterations. Using current design.")
+                    break
 
-                # Refine design based on feedback
                 if feedback.get('issues'):
+                    # Giả sử bạn có hàm refine_layout
                     current_layout = self.refine_layout(current_layout, feedback)
                     print(f"🔧 Applied {len(feedback['issues'])} refinements")
 
-            # Final result
-            final_result = {
-                'objectives': objectives,
-                'background_description': background_description,
-                'layout': current_layout,
-                'dimensions': {'width': width, 'height': height},
-                'iterations': iteration
-            }
-
             print("\n🎉 Banner creation completed!")
 
-            if output_format == "json":
-                return json.dumps(final_result, indent=2, ensure_ascii=False)
-            elif output_format == "svg":
-                # Return the final SVG content
-                return self.export_to_svg(current_layout, background_description, width, height, logo_path)
-            else:
+            if output_format == "svg":
+                return final_svg_content
+            else: # Mặc định trả về JSON
+                final_result = {
+                    'objectives': objectives,
+                    'background_structure': background_structure,
+                    'layout': current_layout,
+                    'dimensions': {'width': width, 'height': height},
+                    'iterations': iteration
+                }
                 return json.dumps(final_result, indent=2, ensure_ascii=False)
 
         except (KeyError, TypeError) as e:
+            import traceback
             print(f"⌫ Error in banner creation during data access: {str(e)}")
-            print("Please check if the LLM output conforms to the expected JSON structure.")
-            return f"Error: {str(e)}"
+            traceback.print_exc()
+            return json.dumps({"error": f"Data structure mismatch: {str(e)}"})
         except Exception as e:
-            print(f"⌫ Error in banner creation: {str(e)}")
-            return f"Error: {str(e)}"
+            import traceback
+            print(f"⌫ An unexpected error occurred in banner creation: {str(e)}")
+            traceback.print_exc()
+            return json.dumps({"error": f"Unexpected error: {str(e)}"})
+
     
     def refine_layout(self, layout_spec: Dict[str, Any], feedback: Dict[str, Any]) -> Dict[str, Any]:
         refined = json.loads(json.dumps(layout_spec))  # Deep copy
