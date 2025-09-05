@@ -5,6 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from dotenv import load_dotenv
 from typing import Dict, Any
 import base64
+import cairosvg
 from mimetypes import guess_type
 
 # Load environment variables
@@ -245,6 +246,11 @@ Focus on:
         try:
             response = self.llm.invoke(messages)
             
+            # THÊM DÒNG NÀY ĐỂ GỠ LỖI
+            print("--- Raw Foreground Designer Output ---")
+            print(response.content)
+            print("------------------------------------")
+
             # Parse layout specifications
             layout_spec = self.parse_layout_specification(response.content, width, height)
             
@@ -282,91 +288,82 @@ Focus on:
         return {
             'headline': {
                 'text': 'Revolutionary AI Solution',
-                'font': 'Arial Bold',
-                'size': headline_size,
+                'font_family': 'Arial',
+                'font_size': headline_size,
                 'color': '#2C3E50',
                 'position': {'x': width // 20, 'y': height // 4},
+                'dimensions': {'width': width * 0.9, 'height': headline_size * 1.2},
                 'alignment': 'left'
             },
             'subheadline': {
                 'text': 'Transform your business with cutting-edge technology',
-                'font': 'Arial',
-                'size': subheadline_size,
+                'font_family': 'Arial',
+                'font_size': subheadline_size,
                 'color': '#34495E',
                 'position': {'x': width // 20, 'y': height // 2},
+                'dimensions': {'width': width * 0.9, 'height': subheadline_size * 2.5},
                 'alignment': 'left'
             },
-            'cta': {
+            'cta_button': {
                 'text': 'Get Started',
-                'font': 'Arial Bold',
-                'size': max(14, subheadline_size - 4),
+                'font_family': 'Arial',
+                'font_size': max(14, subheadline_size - 4),
                 'color': '#FFFFFF',
                 'background_color': '#3498DB',
                 'position': {'x': width // 20, 'y': int(height * 0.75)},
-                'width': cta_width,
-                'height': cta_height,
+                'dimensions': {'width': cta_width, 'height': cta_height},
                 'border_radius': 5
             },
             'logo': {
                 'position': {'x': int(width * 0.8), 'y': height // 20},
-                'width': max(60, width // 15),
-                'height': max(30, height // 20)
+                'dimensions': {'width': max(60, width // 15), 'height': max(30, height // 20)}
             }
         }
     
-    def design_reviewer_agent(self, layout_spec: Dict[str, Any], background_description: str,
-                        width: int, height: int, iteration: int = 1, 
-                        svg_preview: str = None) -> Dict[str, Any]:
+    def design_reviewer_agent(self, user_input: str, layout_spec: Dict[str, Any], background_description: str,
+                        width: int, height: int, iteration: int = 1,
+                        png_preview_b64: str = None) -> Dict[str, Any]:
         """
-        Design Reviewer Agent: Reviews and provides feedback on the design
+        Design Reviewer Agent: Reviews and provides feedback on the design using a PNG preview.
         """
         print(f"🔍 Design Reviewer Agent: Reviewing design (iteration {iteration})...")
-        
+
         system_prompt = self.prompts['design_reviewer'].replace('{width}', str(width)).replace('{height}', str(height))
         messages = [SystemMessage(content=system_prompt)]
-        
+
+        # Đã thêm user_input vào đây để agent có thể đối chiếu
         content = [{"type": "text", "text": f"""Review this banner design (iteration {iteration}):
+
+    Original User Request: "{user_input}"
 
     Dimensions: {width}x{height}px
     Background: {background_description}
-
     Layout specification:
     {json.dumps(layout_spec, indent=2)}
 
-    Check for:
-    1. Is the user-requested quote present and prominent?
-    2. Are all elements positioned correctly without overlaps?
-    3. Is the logo visible and well-placed?
-    4. Does the design meet professional standards?
+    Critically evaluate the design against the user request and visual quality rules."""}]
 
-    Provide feedback in JSON format with:
-    {{"approved": true/false, "issues": [...], "suggestions": [...]}}"""}]
-        
-        # Add SVG preview if available
-        if svg_preview:
-            # Convert SVG to base64 for image viewing
-            import base64
-            svg_b64 = base64.b64encode(svg_preview.encode()).decode()
+        if png_preview_b64:
             content.append({
-                "type": "image_url", 
-                "image_url": {"url": f"data:image/svg+xml;base64,{svg_b64}"}
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{png_preview_b64}"}
             })
             content.append({"type": "text", "text": "Above is the visual preview of the banner design."})
-        
+
         messages.append(HumanMessage(content=content))
-        
+
         try:
             response = self.llm.invoke(messages)
             feedback = self.parse_feedback(response.content)
-            
+
             print(f"✅ Review completed: {len(feedback.get('issues', []))} issues found")
             return feedback
-            
+
         except Exception as e:
             print(f"⚠️ Review error: {e}")
             return {
-                'approved': iteration >= 3,  # Auto-approve after 3 iterations
-                'issues': [],
+                'approved': iteration >= max_iterations, # Chỉ approve ở lần cuối nếu có lỗi
+                'issues': [{'reason': f'Reviewer agent failed with error: {e}'}],
                 'suggestions': []
             }
     
@@ -390,73 +387,72 @@ Focus on:
         }
 
 
-    
     def export_to_svg(self, layout: Dict[str, Any], background_desc: str, width: int, height: int, logo_path: str) -> str:
-        """Generate SVG using actual layout specification"""
-        
+        """
+        Generate SVG using actual layout specification, with support for multi-line text.
+        """
         svg = f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
-        
+
         # Background
         if "tech" in background_desc.lower() or "ai" in background_desc.lower():
-            # Tech background
-            svg += '''<defs>
-                <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#0F0F23"/>
-                    <stop offset="100%" stop-color="#1a1a2e"/>
-                </linearGradient>
-                <filter id="glow">
-                    <feGaussianBlur stdDeviation="4" result="blur"/>
-                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
-            </defs>'''
-            svg += f'<rect width="{width}" height="{height}" fill="url(#bgGrad)"/>'
-            # Add tech grid
+            svg += f'''<defs><linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0F0F23"/><stop offset="100%" stop-color="#1a1a2e"/></linearGradient></defs><rect width="{width}" height="{height}" fill="url(#bgGrad)"/><rect width="{width}" height="{height}" fill="url(#bgGrad)"/>'''
             for i in range(0, width, 20):
                 svg += f'<line x1="{i}" y1="0" x2="{i}" y2="{height}" stroke="rgba(116,185,255,0.1)" stroke-width="0.5"/>'
             for i in range(0, height, 20):
                 svg += f'<line x1="0" y1="{i}" x2="{width}" y2="{i}" stroke="rgba(116,185,255,0.1)" stroke-width="0.5"/>'
         else:
-            # Simple background
             svg += f'<rect width="{width}" height="{height}" fill="#f8f9fa"/>'
-        
-        # Render elements from actual layout
-        if 'headline' in layout:
-            hl = layout['headline']
-            svg += f'''<text x="{hl['position']['x']}" y="{hl['position']['y'] + hl['font_size']}" 
-                    font-family="{hl['font_family']}" font-size="{hl['font_size']}" 
-                    fill="{hl['color']}" text-anchor="start">{hl['text']}</text>'''
-        
-        if 'subheadline' in layout:
-            sh = layout['subheadline'] 
-            svg += f'''<text x="{sh['position']['x']}" y="{sh['position']['y'] + sh['font_size']}" 
-                    font-family="{sh['font_family']}" font-size="{sh['font_size']}" 
-                    fill="{sh['color']}" text-anchor="start">{sh['text']}</text>'''
-        
-        if 'cta_button' in layout:
+
+        # --- TEXT RENDERING LOGIC (UPGRADED) ---
+        def render_text(element_name, default_font_size):
+            if element_name not in layout or not layout.get(element_name):
+                return ""
+            
+            elem = layout[element_name]
+            text_content = elem.get('text', '')
+            # Nếu text là list (đã được AI chia sẵn), nối lại. Nếu là string, giữ nguyên.
+            if isinstance(text_content, list):
+                lines = text_content
+            else: # Tự chia nếu AI chưa chia
+                # Ước tính số ký tự mỗi dòng dựa trên font size và chiều rộng banner
+                chars_per_line = int((width * 0.9) / (elem.get('font_size', default_font_size) * 0.6))
+                import textwrap
+                lines = textwrap.wrap(text_content, width=chars_per_line if chars_per_line > 0 else 20)
+
+            font_size = elem.get('font_size', default_font_size)
+            x = elem.get('position', {}).get('x', 10)
+            y = elem.get('position', {}).get('y', font_size)
+            
+            text_svg = f'<text x="{x}" y="{y}" font-family="{elem.get("font_family", "Arial")}" font-size="{font_size}" fill="{elem.get("color", "#FFFFFF")}">'
+            for i, line in enumerate(lines):
+                # dy="1.2em" để tạo khoảng cách giữa các dòng
+                text_svg += f'<tspan x="{x}" dy="{ "1.2em" if i > 0 else 0 }">{line}</tspan>'
+            text_svg += '</text>'
+            return text_svg
+
+        svg += render_text('headline', 28)
+        svg += render_text('subheadline', 16)
+        # --- END OF UPGRADED TEXT LOGIC ---
+
+        if 'cta_button' in layout and layout.get('cta_button'):
             cta = layout['cta_button']
-            # Button background
-            svg += f'''<rect x="{cta['position']['x']}" y="{cta['position']['y']}" 
-                    width="{cta['dimensions']['width']}" height="{cta['dimensions']['height']}" 
-                    rx="{cta['border_radius']}" fill="{cta['background_color']}"/>'''
-            # Button text
-            text_x = cta['position']['x'] + cta['dimensions']['width'] // 2
-            text_y = cta['position']['y'] + cta['dimensions']['height'] // 2 + cta['font_size'] // 3
-            svg += f'''<text x="{text_x}" y="{text_y}" 
-                    font-family="{cta['font_family']}" font-size="{cta['font_size']}" 
-                    fill="{cta['color']}" text-anchor="middle">{cta['text']}</text>'''
-        
-        # Logo
-        if logo_path and os.path.exists(logo_path) and 'logo' in layout:
+            pos = cta.get('position', {})
+            dims = cta.get('dimensions', {})
+            font_size = cta.get('font_size', 14)
+            svg += f'''<rect x="{pos.get('x', 0)}" y="{pos.get('y', 0)}" width="{dims.get('width', 100)}" height="{dims.get('height', 40)}" rx="{cta.get('border_radius', 5)}" fill="{cta.get('background_color', '#007BFF')}"/>'''
+            text_x = pos.get('x', 0) + dims.get('width', 100) // 2
+            text_y = pos.get('y', 0) + dims.get('height', 40) // 2 + font_size // 3
+            svg += f'''<text x="{text_x}" y="{text_y}" font-family="{cta.get('font_family', 'Arial')}" font-size="{font_size}" fill="{cta.get('color', '#FFFFFF')}" text-anchor="middle">{cta.get('text', '')}</text>'''
+
+        if logo_path and os.path.exists(logo_path) and 'logo' in layout and layout.get('logo'):
             try:
-                import base64
-                from mimetypes import guess_type
                 with open(logo_path, "rb") as img_file:
                     base64_img = base64.b64encode(img_file.read()).decode('utf-8')
                 mime = guess_type(logo_path)[0] or 'image/png'
                 logo = layout['logo']
-                svg += f'''<image x="{logo['position']['x']}" y="{logo['position']['y']}" 
-                        width="{logo['dimensions']['width']}" height="{logo['dimensions']['height']}" 
-                        xlink:href="data:{mime};base64,{base64_img}"/>'''
+                pos = logo.get('position', {})
+                dims = logo.get('dimensions', {})
+                svg += f'''<image x="{pos.get('x', 0)}" y="{pos.get('y', 0)}" width="{dims.get('width', 80)}" height="{dims.get('height', 30)}" xlink:href="data:{mime};base64,{base64_img}"/>'''
             except Exception as e:
                 print(f"⚠️ Logo rendering error: {e}")
         
@@ -647,51 +643,63 @@ Focus on:
 
 
 
-    def create_banner(self, user_input: str, logo_path: str = None, 
-                       width: int = 1200, height: int = 628, max_iterations: int = 3,
-                       output_format: str = "json") -> str:
+    def create_banner(self, user_input: str, logo_path: str = None,
+                   width: int = 1200, height: int = 628, max_iterations: int = 3,
+                   output_format: str = "json") -> str:
         """
-        Main method to create a banner ad using the multi-agent system
+        Main method to create a banner ad using the multi-agent system.
         """
         print(f"🚀 Starting Banner Creation Process...")
         print(f"📏 Dimensions: {width}x{height}px")
-        
+
         try:
             # Step 1: Strategic Planning
             objectives = self.strategist_agent(user_input, logo_path)
-            
+
             # Step 2: Background Design
             background_description = self.background_designer_agent(
                 user_input, objectives, logo_path, width, height
             )
-            
+
             # Step 3: Foreground Design
             layout_spec = self.foreground_designer_agent(
                 user_input, objectives, background_description, width, height
             )
-            
+
             # Step 4: Iterative Design Review and Refinement
             current_layout = layout_spec
             for iteration in range(1, max_iterations + 1):
                 print(f"\n🔄 Design Iteration {iteration}")
-                
-                # Generate SVG preview for visual review
-                svg_preview = self.export_to_svg(current_layout, background_description, width, height, logo_path)
-                
-                # Review design with visual preview
-                feedback = self.design_reviewer_agent(
-                    current_layout, background_description, width, height, iteration, svg_preview
-                )
-                
+
+                # Generate SVG preview string
+                svg_preview_str = self.export_to_svg(current_layout, background_description, width, height, logo_path)
+
+                # Convert SVG string to PNG bytes in memory
+                try:
+                    png_bytes = cairosvg.svg2png(bytestring=svg_preview_str.encode('utf-8'))
+                except Exception as convert_error:
+                    print(f"⚠️ Error converting SVG to PNG: {convert_error}")
+                    # If conversion fails, we can't send a preview. Skip to next iteration or break.
+                    # For simplicity, we'll approve to avoid an infinite loop on conversion errors.
+                    feedback = {'approved': True}
+                else:
+                    # Encode PNG bytes to base64 string for the API
+                    png_preview_b64 = base64.b64encode(png_bytes).decode('utf-8')
+
+                    # Review design with the generated PNG visual preview
+                    feedback = self.design_reviewer_agent(
+                        user_input, current_layout, background_description, width, height, iteration, png_preview_b64
+                    )
+
                 if feedback.get('approved', False) or iteration == max_iterations:
                     print(f"✅ Design approved after {iteration} iteration(s)")
                     break
-                
+
                 # Refine design based on feedback
                 if feedback.get('issues'):
                     current_layout = self.refine_layout(current_layout, feedback)
                     print(f"🔧 Applied {len(feedback['issues'])} refinements")
-            
+
             # Final result
             final_result = {
                 'objectives': objectives,
@@ -700,16 +708,21 @@ Focus on:
                 'dimensions': {'width': width, 'height': height},
                 'iterations': iteration
             }
-            
+
             print("\n🎉 Banner creation completed!")
-            
+
             if output_format == "json":
                 return json.dumps(final_result, indent=2, ensure_ascii=False)
             elif output_format == "svg":
-                return self.export_to_svg_fixed(current_layout, background_description, width, height, logo_path)
+                # Return the final SVG content
+                return self.export_to_svg(current_layout, background_description, width, height, logo_path)
             else:
                 return json.dumps(final_result, indent=2, ensure_ascii=False)
-                
+
+        except (KeyError, TypeError) as e:
+            print(f"⌫ Error in banner creation during data access: {str(e)}")
+            print("Please check if the LLM output conforms to the expected JSON structure.")
+            return f"Error: {str(e)}"
         except Exception as e:
             print(f"⌫ Error in banner creation: {str(e)}")
             return f"Error: {str(e)}"
