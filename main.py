@@ -728,30 +728,43 @@ Focus on:
             return f"Error: {str(e)}"
     
     def refine_layout(self, layout_spec: Dict[str, Any], feedback: Dict[str, Any]) -> Dict[str, Any]:
-        refined = json.loads(json.dumps(layout_spec))  # deep copy
+        refined = json.loads(json.dumps(layout_spec))  # Deep copy
 
         for issue in feedback.get("issues", []):
             elem = issue.get("element")
-            action = issue.get("action")
-            params = issue.get("parameters", {})
-
             if elem not in refined:
                 continue
 
-            if action == "resize":
-                refined[elem]["width"] = params.get("width", refined[elem].get("width"))
-                refined[elem]["height"] = params.get("height", refined[elem].get("height"))
-            elif action == "reposition":
-                refined[elem]["position"]["x"] = params.get("x", refined[elem]["position"]["x"])
-                refined[elem]["position"]["y"] = params.get("y", refined[elem]["position"]["y"])
+            action = issue.get("action")
+            params = issue.get("parameters", {})
+
+            if action == "reposition":
+                if "x" in params:
+                    refined[elem]["position"]["x"] = params["x"]
+                if "y" in params:
+                    refined[elem]["position"]["y"] = params["y"]
             elif action == "recolor":
-                refined[elem]["color"] = params.get("color", refined[elem].get("color"))
-            elif action == "stylechange":
-                if "font" in params:
-                    refined[elem]["font"] = params["font"]
+                if "color" in params:
+                    refined[elem]["color"] = params["color"]
+                if "background_color" in params:
+                    refined[elem]["background_color"] = params["background_color"]
             elif action == "retext":
                 if "text" in params:
                     refined[elem]["text"] = params["text"]
+            elif action == "resize":
+                # Cho phép resize cả dimensions và font_size
+                if "width" in params:
+                    refined[elem].setdefault("dimensions", {})["width"] = params["width"]
+                if "height" in params:
+                    refined[elem].setdefault("dimensions", {})["height"] = params["height"]
+                if "font_size" in params:
+                    refined[elem]["font_size"] = params["font_size"]
+            # Giữ lại stylechange cho các trường hợp khác
+            elif action == "stylechange":
+                if "font_family" in params:
+                    refined[elem]["font_family"] = params["font_family"]
+                if "border_radius" in params:
+                    refined[elem]["border_radius"] = params["border_radius"]
 
         return refined
 
