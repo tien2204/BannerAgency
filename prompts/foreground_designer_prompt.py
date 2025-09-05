@@ -1,4 +1,3 @@
-
 import json
 with open('.layout_demonstrations.json', 'r') as f:
     layout_demonstrations = json.load(f)
@@ -99,14 +98,7 @@ LAYOUT PATTERNS AND IMPLEMENTATION:
 IMPLEMENTATION GUIDELINES:
 
 1. Typography Hierarchy:
-      Small Banners (e.g., 160x600, 300x250):
-      - Headline: 24-32px
-      - Subheadline: 18-24px
-      - Body text: 14-16px
-      - CTA: 16-18px
-
-      Medium Banners (e.g., 728x90, 468x60):
-      - Headline: 32-48px
+      Small Banners (e.g., 160x600, 300x250...(truncated 153 characters)...     - Headline: 32-48px
       - Subheadline: 24-32px
       - Body text: 16-20px
       - CTA: 18-24px
@@ -130,6 +122,7 @@ IMPLEMENTATION GUIDELINES:
    - Use consistent color scheme
    - Consider background variation
    - Ensure CTA stands out
+   **- For high contrast, use bold colors derived from mood/objectives (e.g., neon accents for energetic themes).**
 
 4. Responsive Spacing: Scale gaps proportionally to banner size
    Small Banners (< 300px width):
@@ -147,7 +140,8 @@ IMPLEMENTATION GUIDELINES:
 5. Creative and matching font:
    - Choose the most matching font for the purpose
    - Try to be creative in font selection
-   
+   **- For tech/futuristic themes, consider sans-serif like Orbitron or Roboto; for organic themes, serif or script fonts. Always match mood.**
+
 6. Logo Implementation:
    - Positioning Patterns:
      * Top-left corner (traditional): 16-24px from edges
@@ -172,6 +166,13 @@ IMPLEMENTATION GUIDELINES:
      * Consider logo shape in layout decisions
      * Maintain visual hierarchy with text
      * Ensure logo visibility against background
+     **- Add optional effects like glow/shadow for prominence if the theme calls for artistic emphasis (e.g., in dynamic layouts).**
+
+**Additional Rules for Extensibility:
+- If user specifies a layout (e.g., Z-pattern or Rule-of-Thirds), strictly adhere: Place key elements (logo/headline top-left, CTA bottom-right for Z-pattern).
+- Mandatory Elements if Specified: Include quotes as prominent subheadlines (e.g., 18-24px, high-contrast). Always add a CTA aligned with purpose (e.g., 'Join Now' for engagement).
+- Artistic Enhancements: Optionally add glow effects or particles based on mood (e.g., for tech themes), ensuring readability and theme diversity.
+- Avoid overlaps; calculate positions to fill 80-90% canvas dynamically.**
 
 Always document your layout rationale and ensure all positions are precisely specified in pixels or percentages.
 
@@ -188,4 +189,5 @@ foreground_designer_context_prompt = """
     - Target Audience: {audience}
     - Mood and Tone: {mood}
 
+    **Enforce inclusion of any specified quote as a subheadline and a CTA button encouraging the action if mentioned. Ensure artistic highlights like strong visual flow and no simplistic centering, while adapting to diverse themes.**
     Provide complete specifications following the schema exactly."""

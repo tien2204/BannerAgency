@@ -976,93 +976,84 @@
   },
 
   "tech_futuristic_pattern": {
-    "description": "Tech-focused design with futuristic elements and modern typography",
+    "description": "Tech-focused design with futuristic elements, modern typography, high-contrast colors, and artistic glows/particles for AI products.",
     "example_1200x628": {
       "canvas": {"width": 1200, "height": 628},
       "background": {
         "type": "tech",
         "base_gradient": ["#0F0F23", "#1a1a2e"],
         "tech_elements": [
-          {
-            "type": "grid_lines",
-            "color": "rgba(116,185,255,0.1)",
-            "spacing": 50
-          },
-          {
-            "type": "glow_circle",
-            "position": {"x": 900, "y": 150},
-            "radius": 120,
-            "color": "rgba(116,185,255,0.2)",
-            "blur": 40
-          },
-          {
-            "type": "particles",
-            "count": 30,
-            "area": {"x": 600, "y": 0, "width": 600, "height": 628},
-            "color": "rgba(116,185,255,0.3)"
-          }
+          {"type": "grid_lines", "color": "rgba(116,185,255,0.1)", "spacing": 50},
+          {"type": "glow_circle", "position": {"x": 900, "y": 150}, "radius": 120, "color": "rgba(116,185,255,0.2)", "blur": 40},
+          {"type": "particles", "count": 50, "area": {"x": 600, "y": 0, "width": 600, "height": 628}, "color": "rgba(116,185,255,0.3)"}
         ]
       },
       "elements": [
         {
+          "type": "logo",
+          "position": {"x": 40, "y": 40},
+          "dimensions": {"width": 240, "height": 90},  
+          "styling": {"opacity": 1.0, "filter": "drop-shadow(0 0 10px rgba(116,185,255,0.5))"}
+        },
+        {
           "type": "headline",
-          "text": "AI REVOLUTION",
-          "position": {"x": 80, "y": 120},
-          "dimensions": {"width": 600, "height": 100},
-          "styling": {
-            "font_family": "Orbitron",
-            "font_size": 64,
-            "font_weight": "900",
-            "color": "#74B9FF",
-            "text_shadow": "0 0 20px rgba(116,185,255,0.5)",
-            "letter_spacing": "3px",
-            "alignment": "left"
-          }
+          "text": "Revolutionary AI Solution",
+          "position": {"x": 80, "y": 150},
+          "dimensions": {"width": 800, "height": 100},
+          "styling": {"font_family": "Orbitron", "font_size": 64, "font_weight": "900", "color": "#74B9FF", "text_shadow": "0 0 20px rgba(116,185,255,0.5)", "letter_spacing": "3px", "alignment": "left"}
         },
         {
           "type": "subheadline",
-          "text": "Next-Generation Technology Solutions",
-          "position": {"x": 80, "y": 240},
-          "dimensions": {"width": 550, "height": 60},
-          "styling": {
-            "font_family": "Roboto",
-            "font_size": 28,
-            "font_weight": "300",
-            "color": "#DDD6FE",
-            "alignment": "left"
-          }
-        },
-        {
-          "type": "stats_box",
-          "elements": [
-            {"label": "99%", "desc": "Accuracy", "position": {"x": 80, "y": 340}},
-            {"label": "24/7", "desc": "Support", "position": {"x": 200, "y": 340}},
-            {"label": "AI", "desc": "Powered", "position": {"x": 320, "y": 340}}
-          ],
-          "styling": {
-            "font_family": "Orbitron",
-            "label_size": 32,
-            "desc_size": 14,
-            "color": "#FFFFFF"
-          }
+          "text": "Transform your business with cutting-edge AI",
+          "position": {"x": 80, "y": 280},
+          "dimensions": {"width": 700, "height": 80},
+          "styling": {"font_family": "Roboto", "font_size": 32, "font_weight": "300", "color": "#FFFFFF", "alignment": "left"}
         },
         {
           "type": "cta_button",
-          "text": "Launch Now",
-          "position": {"x": 80, "y": 450},
-          "dimensions": {"width": 200, "height": 60},
-          "styling": {
-            "font_family": "Orbitron",
-            "font_size": 18,
-            "font_weight": "700",
-            "color": "#0F0F23",
-            "background": "linear-gradient(135deg, #74B9FF, #0984E3)",
-            "border_radius": 30,
-            "box_shadow": "0 0 25px rgba(116,185,255,0.4)"
-          }
+          "text": "Get Started",
+          "position": {"x": 900, "y": 500},
+          "dimensions": {"width": 220, "height": 60},
+          "styling": {"font_family": "Orbitron", "font_size": 20, "font_weight": "700", "color": "#0F0F23", "background": "linear-gradient(135deg, #74B9FF, #0984E3)", "border_radius": 30, "box_shadow": "0 0 25px rgba(116,185,255,0.4)"}
         }
       ],
-      "rationale": "Futuristic tech design with glowing effects and sci-fi typography"
+      "rationale": "Futuristic AI design with glowing effects, large top-left logo, Z-pattern flow (logo/headline top-left, CTA bottom-right), and artistic particles for professional tech appeal like event/food banners."
+    }
+  },
+  "ai_launch_pattern": {
+    "description": "Z-pattern layout for AI launches with artistic highlights, strong colors, and Rule-of-Thirds integration.",
+    "example_1200x628": {
+      "canvas": {"width": 1200, "height": 628},
+      "elements": [
+        {
+          "type": "logo",
+          "position": {"x": 40, "y": 40},
+          "dimensions": {"width": 240, "height": 90},  
+          "styling": {"opacity": 1.0, "filter": "drop-shadow(0 0 10px rgba(116,185,255,0.5))"}
+        },
+        {
+          "type": "headline",
+          "text": "Revolutionary AI Solution",
+          "position": {"x": 80, "y": 150},
+          "dimensions": {"width": 800, "height": 100},
+          "styling": {"font_family": "Orbitron", "font_size": 64, "font_weight": "900", "color": "#74B9FF", "text_shadow": "0 0 20px rgba(116,185,255,0.5)", "letter_spacing": "3px", "alignment": "left"}
+        },
+        {
+          "type": "subheadline",
+          "text": "Transform your business with cutting-edge AI",
+          "position": {"x": 80, "y": 280},
+          "dimensions": {"width": 700, "height": 80},
+          "styling": {"font_family": "Roboto", "font_size": 32, "font_weight": "300", "color": "#FFFFFF", "alignment": "left"}
+        },
+        {
+          "type": "cta_button",
+          "text": "Get Started",
+          "position": {"x": 900, "y": 500},
+          "dimensions": {"width": 220, "height": 60},
+          "styling": {"font_family": "Orbitron", "font_size": 20, "font_weight": "700", "color": "#0F0F23", "background": "linear-gradient(135deg, #74B9FF, #0984E3)", "border_radius": 30, "box_shadow": "0 0 25px rgba(116,185,255,0.4)"}
+        }
+      ],
+      "rationale": "Dynamic Z-flow with artistic emphasis on headline and logo, mirroring professional banners."
     }
   }
 }

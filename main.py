@@ -365,99 +365,46 @@ Focus on:
 
 
     
-    def export_to_svg(self, layout: Dict[str, Any], background_description: str,
-                  width: int, height: int, logo_path: str = None) -> str:
-        """Convert layout spec into more artistic SVG with enhanced styles"""
-        svg_elements = []
-
-        # === Background: gradient mesh hoặc pattern ===
-        svg_elements.append(f'''
-        <defs>
-            <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:#0f2027;stop-opacity:1" />
-                <stop offset="50%" style="stop-color:#203a43;stop-opacity:1" />
-                <stop offset="100%" style="stop-color:#2c5364;stop-opacity:1" />
-            </linearGradient>
-            <pattern id="dotPattern" width="40" height="40" patternUnits="userSpaceOnUse">
-                <circle cx="5" cy="5" r="2" fill="rgba(255,255,255,0.15)"/>
-            </pattern>
-            <filter id="textShadow" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="3" dy="3" stdDeviation="4" flood-opacity="0.3"/>
-            </filter>
-        </defs>
-        <rect width="{width}" height="{height}" fill="url(#bgGradient)"/>
-        <rect width="{width}" height="{height}" fill="url(#dotPattern)"/>
-        ''')
-
-        # === Headline ===
-        if "headline" in layout:
-            hl = layout["headline"]
-            svg_elements.append(f'''
-            <text x="{hl["position"]["x"]}" y="{hl["position"]["y"]}"
-                font-family="{hl.get("font", "Helvetica Neue")}" 
-                font-size="{hl["size"]}px" fill="{hl["color"]}"
-                filter="url(#textShadow)" text-anchor="{hl.get("alignment","start")}"
-                dominant-baseline="hanging">
-                {hl["text"]}
-            </text>''')
-
-        # === Subheadline ===
-        if "subheadline" in layout:
-            sh = layout["subheadline"]
-            svg_elements.append(f'''
-            <text x="{sh["position"]["x"]}" y="{sh["position"]["y"]}"
-                font-family="{sh.get("font", "Open Sans")}" 
-                font-size="{sh["size"]}px" fill="{sh["color"]}"
-                text-anchor="{sh.get("alignment","start")}"
-                dominant-baseline="hanging">
-                {sh["text"]}
-            </text>''')
-
-        # === CTA button ===
-        if "cta" in layout:
-            cta = layout["cta"]
-            svg_elements.append(f'''
-            <defs>
-                <linearGradient id="ctaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#ff512f;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#dd2476;stop-opacity:1" />
-                </linearGradient>
-            </defs>
-            <rect x="{cta["position"]["x"]}" y="{cta["position"]["y"]}" 
-                width="{cta["width"]}" height="{cta["height"]}" 
-                rx="{cta["border_radius"]}" ry="{cta["border_radius"]}"
-                fill="url(#ctaGradient)" filter="url(#buttonShadow)"/>
-            <text x="{cta["position"]["x"] + cta["width"]/2}" 
-                y="{cta["position"]["y"] + cta["height"]/2}" 
-                font-family="{cta["font"]}" font-size="{cta["size"]}px" 
-                fill="{cta["color"]}" text-anchor="middle" 
-                dominant-baseline="central">{cta["text"]}</text>
-            ''')
-
-        # === Logo ===
-        if "logo" in layout:
-            logo = layout["logo"]
-            if logo_path and os.path.exists(logo_path):
-                logo_data = self.prepare_image_message(logo_path)
-                svg_elements.append(f'''
-                <rect x="{logo["position"]["x"]-10}" y="{logo["position"]["y"]-10}" 
-                    width="{logo["width"]+20}" height="{logo["height"]+20}" 
-                    rx="12" ry="12" fill="rgba(255,255,255,0.6)"/>
-                <image x="{logo["position"]["x"]}" y="{logo["position"]["y"]}" 
-                    width="{logo["width"]}" height="{logo["height"]}" 
-                    href="{logo_data}" preserveAspectRatio="xMidYMid meet"/>''')
-            else:
-                svg_elements.append(f'''
-                <text x="{logo["position"]["x"]}" y="{logo["position"]["y"]}" 
-                    font-family="Arial Black" font-size="28" 
-                    fill="#ffffff">LOGO</text>''')
-
-        # === Wrap SVG ===
-        return f'''<?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-            width="{width}" height="{height}" viewBox="0 0 {width} {height}">
-            {''.join(svg_elements)}
-        </svg>'''
+    def export_to_svg(self, layout: Dict, background_desc: str, width: int, height: int, logo_path: str) -> str:
+        svg = f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+        
+        # Background with artistic gradient/particles (based on tech_futuristic)
+        svg += '<defs><linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0F0F23"/><stop offset="100%" stop-color="#1a1a2e"/></linearGradient></defs>'
+        svg += f'<rect width="{width}" height="{height}" fill="url(#bgGrad)"/>'
+        # Add particles as circles
+        import random
+        for _ in range(50):
+            x, y = random.randint(600, 1200), random.randint(0, 628)
+            svg += f'<circle cx="{x}" cy="{y}" r="2" fill="rgba(116,185,255,0.3)"/>'
+        # Grid lines
+        for i in range(0, width, 50):
+            svg += f'<line x1="{i}" y1="0" x2="{i}" y2="{height}" stroke="rgba(116,185,255,0.1)" stroke-width="1"/>'
+        for i in range(0, height, 50):
+            svg += f'<line x1="0" y1="{i}" x2="{width}" y2="{i}" stroke="rgba(116,185,255,0.1)" stroke-width="1"/>'
+        # Glow circle
+        svg += '<filter id="glow"><feGaussianBlur stdDeviation="40" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+        svg += '<circle cx="900" cy="150" r="120" fill="rgba(116,185,255,0.2)" filter="url(#glow)"/>'
+        
+        # Logo (base64 encode if path provided)
+        if logo_path:
+            with open(logo_path, "rb") as img_file:
+                base64_img = base64.b64encode(img_file.read()).decode('utf-8')
+            mime = guess_type(logo_path)[0]
+            logo_x, logo_y = 40, 40  # Top-left
+            logo_w, logo_h = 240, 90
+            svg += f'<image x="{logo_x}" y="{logo_y}" width="{logo_w}" height="{logo_h}" xlink:href="data:{mime};base64,{base64_img}" filter="drop-shadow(0 0 10px rgba(116,185,255,0.5))"/>'
+        
+        # Elements from layout (example; adapt to your layout_dict)
+        for elem in layout.get('elements', []):
+            if elem['type'] == 'headline':
+                svg += f'<text x="{elem["position"]["x"]}" y="{elem["position"]["y"] + elem["dimensions"]["height"]/2}" font-family="{elem["styling"]["font_family"]}" font-size="{elem["styling"]["font_size"]}" fill="{elem["styling"]["color"]}" font-weight="{elem["styling"]["font_weight"]}" text-anchor="start" style="text-shadow: {elem["styling"]["text_shadow"]};">{elem["text"]}</text>'
+            # Add similar for subheadline, cta (use <rect> for button bg + text)
+            if elem['type'] == 'cta_button':
+                svg += f'<rect x="{elem["position"]["x"]}" y="{elem["position"]["y"]}" width="{elem["dimensions"]["width"]}" height="{elem["dimensions"]["height"]}" rx="{elem["styling"]["border_radius"]}" fill="{elem["styling"]["background"]}" style="filter: drop-shadow({elem["styling"]["box_shadow"]});"/>'
+                svg += f'<text x="{elem["position"]["x"] + elem["dimensions"]["width"]/2}" y="{elem["position"]["y"] + elem["dimensions"]["height"]/2 + elem["styling"]["font_size"]/4}" font-family="{elem["styling"]["font_family"]}" font-size="{elem["styling"]["font_size"]}" fill="{elem["styling"]["color"]}" font-weight="{elem["styling"]["font_weight"]}" text-anchor="middle">{elem["text"]}</text>'
+        
+        svg += '</svg>'
+        return svg
 
 
     def extract_logo_name_from_path(self, logo_path: str) -> str:
