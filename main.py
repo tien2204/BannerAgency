@@ -23,7 +23,7 @@ class BannerAgent:
             "model_kwargs": {
                 # Sửa cảnh báo UserWarning: chuyển max_completion_tokens vào đây
                 # và đổi tên thành max_tokens theo chuẩn của OpenAI API
-                "max_completion_tokens": 4000 
+                "max_completion_tokens": 8192 
             }
         }
 
