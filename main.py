@@ -42,11 +42,14 @@ class BannerAgent:
             from prompts.foreground_designer_prompt import foreground_designer_system_prompt, foreground_designer_context_prompt
             from prompts.design_reviewer_prompt import system_prompt as reviewer_system_prompt
             from prompts.developer_prompt import developer_prompt
+            from prompts.visual_asset_prompt import visual_asset_system_prompt, visual_asset_context_prompt
             
             self.prompts = {
             'strategist_context_prompt': strategist_context_prompt,    
             'strategist_system_prompt': strategist_system_prompt,
             
+            'visual_asset_system_prompt': visual_asset_system_prompt,
+            'visual_asset_context_prompt': visual_asset_context_prompt,
             
             'background_designer_system_prompt': background_designer_system_prompt,
             'background_designer_context_prompt': background_designer_context_prompt,
@@ -203,20 +206,21 @@ Focus on:
         
         return objectives
     
-   
-    def background_designer_agent(self, theme: str, mood: str, color_palette: Dict[str, str]) -> Dict[str, Any]:
+
+    def background_designer_agent(self, theme: str, mood: str, color_palette: Dict[str, str], hero_image_path: str = None) -> Dict[str, Any]:
         """
-        Background Designer Agent: Generates a structured JSON for the background
-        based on the creative direction provided by the Strategist.
+        Art Director Agent: Decides the overall composition by combining
+        a hero image and a structured background.
         """
-        print("🎨 Background Designer Agent: Designing background structure...")
+        print("🎬 Art Director (Background Designer): Designing composition...")
         system_prompt = self.prompts['background_designer_system_prompt']
         
-        # Dùng context prompt mới, chỉ chứa các thông tin cần thiết
+        # Thêm hero_image_path vào context
         context_prompt = self.prompts['background_designer_context_prompt'].format(
             theme=theme,
             mood=mood,
-            color_palette=str(color_palette) # Chuyển dict thành chuỗi để đưa vào prompt
+            color_palette=str(color_palette),
+            hero_image_path=hero_image_path
         )
         
         messages = [
@@ -225,43 +229,58 @@ Focus on:
         ]
         
         try:
-            # Dùng self.json_llm để bắt buộc output là JSON
             response = self.json_llm.invoke(messages)
             structure = json.loads(response.content)
-            print(f"✅ Background structure designed: {structure}")
+            print(f"✅ Composition designed: {structure}")
             return structure
         except Exception as e:
-            print(f"⚠️ Background Designer error: {e}")
-            # Fallback an toàn: trả về một nền trắng đặc
-            return {
-            "base_layer": { "type": "solid", "colors": ["#FFFFFF"] },
-            "overlay_layer": { "type": "none" }
-            }
+            print(f"⚠️ Art Director error: {e}")
+            # Fallback an toàn, ưu tiên có ảnh nếu có
+            if hero_image_path:
+                return {
+                    "composition_type": "full_bleed", "hero_image_path": hero_image_path,
+                    "background_structure": {"base_layer": {"type": "solid", "colors": ["#000000"]}, "overlay_layer": {"type": "none"}},
+                    "text_overlay": {"apply": True, "color": "#000000", "opacity": 0.5}
+                }
+            else: # Fallback không có ảnh
+                return {
+                    "composition_type": "background_only", "hero_image_path": None,
+                    "background_structure": {"base_layer": {"type": "solid", "colors": ["#CCCCCC"]}, "overlay_layer": {"type": "none"}},
+                    "text_overlay": {"apply": False}
+                }
     
  
     def foreground_designer_agent(self, user_input: str, objectives: Dict[str, Any], 
-                                    width: int, height: int) -> Dict[str, Any]:
+                                width: int, height: int) -> Dict[str, Any]:
         """
-        Foreground Designer Agent: Creates layout and typography specifications,
-        using the color palette from the objectives.
+        Foreground Designer Agent: Creates layout and typography specifications.
+        It translates the new rich color palette into the simple format expected by the prompt.
         """
         print("📝 Foreground Designer Agent: Designing layout...")
         
-        # Lấy các thông tin từ `objectives` mới
-        color_palette = objectives.get('color_palette', {})
+        rich_color_palette = objectives.get('color_palette', {})
         theme = objectives.get('theme', 'general')
         mood = objectives.get('mood', 'professional')
 
+        # --- BƯỚC PHIÊN DỊCH QUAN TRỌNG ---
+        # Dịch từ bảng màu mới (rich) sang bảng màu cũ (simple) mà prompt đang mong đợi.
+        simple_color_palette = {
+            "text": rich_color_palette.get("primary_text", "#000000"), # Lấy primary_text, fallback về màu đen
+            "accent": rich_color_palette.get("accent_1", "#007BFF")    # Lấy accent_1, fallback về màu xanh
+        }
+        # --- KẾT THÚC BƯỚC PHIÊN DỊCH ---
+
         system_prompt = self.prompts.get('foreground_designer_system_prompt')
         
-        # Dùng context prompt mới, truyền các giá trị từ `objectives`
+        # Giờ đây, chúng ta truyền `simple_color_palette` vào prompt.
+        # Prompt sẽ nhận được chính xác những gì nó mong đợi.
         context_prompt = self.prompts.get('foreground_designer_context_prompt').format(
             width=width,
             height=height,
             user_input=user_input,
             theme=theme,
             mood=mood,
-            color_palette=str(color_palette)
+            color_palette=str(simple_color_palette) # TRUYỀN BẢNG MÀU ĐÃ ĐƯỢC DỊCH
         )
 
         messages = [
@@ -271,12 +290,14 @@ Focus on:
         
         try:
             response = self.json_llm.invoke(messages)
-            layout_spec = self.parse_layout_specification(response.content, width, height)
+            # Sửa đổi quan trọng: dùng json.loads trực tiếp để ổn định hơn
+            layout_spec = json.loads(response.content)
             print("✅ Foreground layout designed")
             return layout_spec
         except Exception as e:
             print(f"⚠️ Foreground designer error: {e}")
-            return self.get_fallback_layout(width, height)
+            # Thử parse lại một lần nữa nếu json.loads thất bại
+            return self.parse_layout_specification(response.content, width, height)
     
     def parse_layout_specification(self, response: str, width: int, height: int) -> Dict[str, Any]:
         """Parse structured layout specification from LLM response"""
@@ -402,9 +423,106 @@ Focus on:
             "issues": [],
             "suggestions": []
         }
+    
+        # THÊM CÁC HÀM MỚI NÀY VÀO BÊN TRONG CLASS BannerAgent
+
+    def visual_asset_agent(self, user_input: str, theme: str, mood: str) -> str:
+        """
+        Visual Asset Agent: Creates a detailed prompt for a text-to-image model.
+        """
+        print("🖼️ Visual Asset Agent: Generating image prompt...")
+        system_prompt = self.prompts['visual_asset_system_prompt']
+        context_prompt = self.prompts['visual_asset_context_prompt'].format(
+            user_input=user_input,
+            theme=theme,
+            mood=mood
+        )
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=context_prompt)
+        ]
+        
+        try:
+            response = self.llm.invoke(messages)
+            image_prompt = response.content.strip().strip('"')
+            print(f"✅ Image prompt generated: \"{image_prompt}\"")
+            return image_prompt
+        except Exception as e:
+            print(f"⚠️ Visual Asset Agent error: {e}")
+            return f"A minimalist, abstract background fitting a {theme} theme."
 
 
-    def export_to_svg(self, layout: Dict[str, Any], background_structure: Dict[str, Any], width: int, height: int, logo_path: str) -> str:
+    def text_to_image_generation(self, prompt: str, width: int, height: int, image_name: str = "hero_image.png") -> str:
+        """
+        Calls DALL-E 3, downloads the image, resizes it for efficiency, and saves it.
+        """
+        print(f"🤖 Calling DALL-E 3 API with prompt: \"{prompt[:80]}...\"")
+        
+        from openai import OpenAI
+        from PIL import Image
+        import requests
+        import io
+
+        try:
+            client = OpenAI()
+            
+            response = client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                size="1024x1024", # Kích thước phổ biến của DALL-E 3
+                quality="standard",
+                n=1,
+                response_format="url"
+            )
+            
+            image_url = response.data[0].url
+            print(f"✅ DALL-E 3 generated image URL: {image_url.split('?')[0]}") # In URL sạch
+            
+            # Tải ảnh từ URL
+            image_response = requests.get(image_url)
+            image_response.raise_for_status() # Báo lỗi nếu tải thất bại
+
+            # --- BƯỚC TỐI ƯU HÓA MỚI ---
+            print(f"🖼️ Resizing image to fit banner dimensions ({width}x{height})...")
+            
+            # Mở ảnh từ dữ liệu tải về
+            img = Image.open(io.BytesIO(image_response.content))
+            
+            # Thay đổi kích thước ảnh một cách thông minh (giữ tỷ lệ)
+            # Bằng cách này, chúng ta đảm bảo ảnh vừa khít với chiều rộng hoặc chiều cao
+            # của banner mà không bị méo.
+            img.thumbnail((width, height), Image.Resampling.LANCZOS)
+            
+            # Tạo một ảnh nền mới và dán ảnh đã resize vào giữa
+            # Điều này xử lý trường hợp tỷ lệ ảnh DALL-E không khớp với banner
+            final_img = Image.new("RGB", (width, height))
+            paste_coords = ((width - img.width) // 2, (height - img.height) // 2)
+            final_img.paste(img, paste_coords)
+            # --- KẾT THÚC BƯỚC TỐI ƯU HÓA ---
+            
+            output_dir = "generated_images"
+            os.makedirs(output_dir, exist_ok=True)
+            image_path = os.path.join(output_dir, image_name)
+            
+            # Lưu ảnh đã được resize
+            final_img.save(image_path, "PNG")
+            
+            print(f"✅ Image downloaded, resized, and saved to: {image_path}")
+            return image_path
+
+        except Exception as e:
+            print(f"⚠️ DALL-E 3 process failed: {e}")
+            # Fallback an toàn
+            img = Image.new('RGB', (width, height), color = '#555555')
+            d = ImageDraw.Draw(img)
+            d.text((10,10), "API/Resize failed", fill=(255,255,255))
+            fallback_path = os.path.join("generated_images", "fallback_image.png")
+            img.save(fallback_path)
+            return fallback_path
+
+
+    def export_to_svg(self, layout: Dict[str, Any], composition: Dict[str, Any], width: int, height: int, logo_path: str) -> str:
         """
         Generate SVG with embedded Google Fonts for consistent rendering.
         Includes error handling for font fetching.
@@ -439,7 +557,8 @@ Focus on:
         # Thêm thẻ <defs> và <style> để chứa định nghĩa font và gradient
         svg += f'<defs><style>{font_styles}</style>'
 
-        base_layer = background_structure.get("base_layer", {"type": "solid", "colors": ["#FFFFFF"]})
+        bg_struct = composition.get("background_structure", {})
+        base_layer = bg_struct.get("base_layer", {"type": "solid", "colors": ["#FFFFFF"]})
         if base_layer.get("type") == "gradient" and len(base_layer.get("colors", [])) >= 2:
             colors = base_layer["colors"]
             svg += f'<linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="{colors[0]}"/><stop offset="100%" stop-color="{colors[1]}"/></linearGradient>'
@@ -450,15 +569,14 @@ Focus on:
             svg += '</defs>'
             svg += f'<rect width="{width}" height="{height}" fill="{color}"/>'
 
-        # 2. Vẽ Overlay Layer từ JSON
-        overlay_layer = background_structure.get("overlay_layer")
+        # 2. **VẼ HỌA TIẾT NỀN (OVERLAY_LAYER) - SỬ DỤNG LOGIC CHI TIẾT CỦA BẠN**
+        overlay_layer = bg_struct.get("overlay_layer")
         if overlay_layer and overlay_layer.get("type") != "none":
             overlay_type = overlay_layer.get("type")
             color = overlay_layer.get("color", "#FFFFFF")
             opacity = overlay_layer.get("opacity", 0.1)
             
             pattern_svg = ""
-            # Ánh xạ 'type' từ JSON sang hàm vẽ tương ứng
             if overlay_type in ["grid", "circuitry"]:
                 for i in range(0, width, 20):
                     pattern_svg += f'<line x1="{i}" y1="0" x2="{i}" y2="{height}" stroke="{color}" stroke-opacity="{opacity}" stroke-width="0.5"/>'
@@ -469,10 +587,31 @@ Focus on:
                     import random
                     x, y = random.randint(0, width), random.randint(0, height)
                     scale = random.uniform(0.5, 1.2)
-                    # Sử dụng đường path SVG cho hình dạng hữu cơ
                     pattern_svg += f'<path transform="translate({x}, {y}) scale({scale})" fill="{color}" fill-opacity="{opacity}" d="M15.1,3.1C14,1.2,12.3,0,10,0C7.7,0,6,1.2,4.9,3.1C3.8,5,3.8,7,4.9,8.9l-4,6.9C0.3,16.7,0,17.9,0,19c0,3.3,2.7,6,6,6 c1.1,0,2.3-0.3,3.1-0.9l6.9-4c1.9,1.1,3.9,1.1,5.8,0l6.9,4c0.8,0.6,2,0.9,3.1,0.9c3.3,0,6-2.7,6-6c0-1.1-0.3-2.3-0.9-3.1l-4-6.9 C26.2,7,26.2,5,25.1,3.1z"/>'
             
             svg += pattern_svg
+
+        comp_type = composition.get("composition_type")
+        hero_path = composition.get("hero_image_path")
+        if hero_path and os.path.exists(hero_path):
+            try:
+                with open(hero_path, "rb") as img_file:
+                    base64_img = base64.b64encode(img_file.read()).decode('utf-8')
+                mime = guess_type(hero_path)[0] or 'image/png'
+                
+                if comp_type == "full_bleed":
+                    svg += f'<image x="0" y="0" width="{width}" height="{height}" xlink:href="data:{mime};base64,{base64_img}" preserveAspectRatio="xMidYMid slice"/>'
+                elif comp_type == "split_screen":
+                    svg += f'<image x="0" y="0" width="{width * 0.5}" height="{height}" xlink:href="data:{mime};base64,{base64_img}" preserveAspectRatio="xMidYMid slice"/>'
+            except Exception as e:
+                print(f"⚠️ Hero image rendering error: {e}")
+
+        # 4. Vẽ lớp phủ cho văn bản (Text Overlay)
+        text_overlay = composition.get("text_overlay")
+        if text_overlay and text_overlay.get("apply"):
+            color = text_overlay.get("color", "#000000")
+            opacity = text_overlay.get("opacity", 0.5)
+            svg += f'<rect x="0" y="0" width="{width}" height="{height}" fill="{color}" fill-opacity="{opacity}"/>'    
 
         # --- PHẦN 2: Render Text với font đã được nhúng ---
         def render_text(element_name, default_font_size):
@@ -709,12 +848,12 @@ Focus on:
 
 
     def create_banner(self, user_input: str, logo_path: str = None,
-                    width: int = 1200, height: int = 628, max_iterations: int = 3,
-                    output_format: str = "json") -> str:
+                   width: int = 1200, height: int = 628, max_iterations: int = 3,
+                   output_format: str = "json") -> str:
         """
-        Main method to create a banner ad using the new, flexible multi-agent system.
+        Main method using the Art Director architecture to create a banner.
         """
-        print(f"🚀 Starting Banner Creation Process...")
+        print(f"🚀 Starting Banner Creation Process (Art Director Mode)...")
         print(f"📏 Dimensions: {width}x{height}px")
 
         try:
@@ -725,29 +864,32 @@ Focus on:
             color_palette = objectives.get("color_palette", {})
             print(f"🎯 Strategist Agent: Theme='{theme}', Colors={color_palette}")
 
-            # Step 2: Background Design
-            background_structure = self.background_designer_agent(theme, mood, color_palette)
-            print(f"🎨 Background Designer Agent: Generated structure: {background_structure}")
+            # Step 2: Visual Asset Creation
+            hero_image_prompt = self.visual_asset_agent(user_input, theme, mood)
+            hero_image_path = self.text_to_image_generation(hero_image_prompt, width, height)
 
-            # Step 3: Foreground Design
-            # SỬA LỖI: Đã xóa tham số thứ 3 thừa thãi
+            # Step 3: Composition Design (using the upgraded background_designer_agent)
+            composition_structure = self.background_designer_agent(
+                theme, mood, color_palette, hero_image_path
+            )
+            print(f"🎨 Composition Director: Generated structure: {composition_structure}")
+
+            # Step 4: Foreground Design
             layout_spec = self.foreground_designer_agent(user_input, objectives, width, height)
             
-            # Gộp color_palette vào layout_spec để tiện sử dụng
             if 'color_palette' not in layout_spec:
-                layout_spec['color_palette'] = color_palette
+                 layout_spec['color_palette'] = color_palette
 
-            # Step 4: Iterative Design Review and Refinement
+            # Step 5: Iterative Design Review and Refinement
             current_layout = layout_spec
-            final_svg_content = "" # Biến để lưu trữ SVG cuối cùng
+            final_svg_content = ""
 
             for iteration in range(1, max_iterations + 1):
                 print(f"\n🔄 Design Iteration {iteration}")
 
-                svg_content = self.export_to_svg(current_layout, background_structure, width, height, logo_path)
+                svg_content = self.export_to_svg(current_layout, composition_structure, width, height, logo_path)
                 final_svg_content = svg_content
 
-                # Convert SVG string to PNG bytes for review
                 try:
                     png_bytes = cairosvg.svg2png(bytestring=svg_content.encode('utf-8'))
                     png_preview_b64 = base64.b64encode(png_bytes).decode('utf-8')
@@ -755,9 +897,7 @@ Focus on:
                     print(f"⚠️ Error converting SVG to PNG: {convert_error}. Approving to avoid loop.")
                     feedback = {'approved': True}
                 else:
-                    # Review design with the visual preview
-                    # SỬA LỖI: Truyền `background_structure` dưới dạng chuỗi JSON để Reviewer có thể đọc
-                    background_info_for_reviewer = json.dumps(background_structure)
+                    background_info_for_reviewer = json.dumps(composition_structure)
                     feedback = self.design_reviewer_agent(
                         user_input, current_layout, background_info_for_reviewer, width, height, iteration, png_preview_b64
                     )
@@ -771,7 +911,6 @@ Focus on:
                     break
 
                 if feedback.get('issues'):
-                    # Giả sử bạn có hàm refine_layout
                     current_layout = self.refine_layout(current_layout, feedback)
                     print(f"🔧 Applied {len(feedback['issues'])} refinements")
 
@@ -779,21 +918,16 @@ Focus on:
 
             if output_format == "svg":
                 return final_svg_content
-            else: # Mặc định trả về JSON
+            else:
                 final_result = {
                     'objectives': objectives,
-                    'background_structure': background_structure,
+                    'composition_structure': composition_structure,
                     'layout': current_layout,
                     'dimensions': {'width': width, 'height': height},
                     'iterations': iteration
                 }
                 return json.dumps(final_result, indent=2, ensure_ascii=False)
 
-        except (KeyError, TypeError) as e:
-            import traceback
-            print(f"⌫ Error in banner creation during data access: {str(e)}")
-            traceback.print_exc()
-            return json.dumps({"error": f"Data structure mismatch: {str(e)}"})
         except Exception as e:
             import traceback
             print(f"⌫ An unexpected error occurred in banner creation: {str(e)}")
